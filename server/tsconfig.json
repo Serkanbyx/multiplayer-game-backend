@@ -4,8 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
-    "rootDir": ".",
-    "baseUrl": ".",
+    "rootDir": "..",
     "paths": { "@mpg/shared/*": ["../shared/*"] },
     "types": ["node"]
   },

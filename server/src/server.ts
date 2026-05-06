@@ -12,6 +12,7 @@ import { sanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
 import { globalLimiter } from './middleware/rateLimiters.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRouter from './routes/authRoutes.js';
+import userRouter from './routes/userRoutes.js';
 
 const app = express();
 
@@ -52,7 +53,7 @@ app.get('/api/health', (_req, res) => {
 
 // 11. Routes
 app.use('/api/auth', authRouter);
-// app.use('/api/users', usersRouter);        // Step 5+
+app.use('/api/users', userRouter);
 // app.use('/api/matches', matchesRouter);    // Step 5+
 // app.use('/api/leaderboard', leaderboardRouter); // Step 5+
 // app.use('/api/admin', adminRouter);        // Step 5+

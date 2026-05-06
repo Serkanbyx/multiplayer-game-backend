@@ -42,15 +42,16 @@ export interface IUserBase {
   updatedAt: string;
 }
 
-/** Herkese açık kullanıcı profili */
+/** Herkese açık kullanıcı profili — privacy.showStats false ise stats alanları gönderilmez */
 export interface PublicUser {
-  id: string;
   username: string;
   displayName: string;
   avatarUrl: string;
-  stats: GameStats;
   bio: string;
+  role: 'player' | 'admin';
   createdAt: string;
+  stats?: GameStats;
+  statsByGame?: Record<string, GameStats>;
 }
 
 /** Kullanıcının kendi profil bilgileri (email dahil) */

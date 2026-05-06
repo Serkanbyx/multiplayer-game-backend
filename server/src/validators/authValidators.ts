@@ -108,3 +108,15 @@ export const deleteAccountValidator: ValidationChain[] = [
     .notEmpty()
     .withMessage('Password confirmation is required'),
 ];
+
+/* ------------------------------------------------------------------ */
+/*  Guest login                                                        */
+/* ------------------------------------------------------------------ */
+
+export const guestLoginValidator: ValidationChain[] = [
+  body('displayName')
+    .trim()
+    .escape()
+    .isLength({ min: 3, max: 20 })
+    .withMessage('Display name must be 3–20 characters'),
+];

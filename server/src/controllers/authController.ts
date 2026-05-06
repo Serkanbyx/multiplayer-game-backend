@@ -1,8 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import User, { type IUser } from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
-import type { RegisteredJwtPayload } from '@mpg/shared/types/auth.js';
+import type { RegisteredJwtPayload, GuestJwtPayload } from '@mpg/shared/types/auth.js';
 
 /* ------------------------------------------------------------------ */
 /*  POST /api/auth/register                                            */
@@ -198,6 +199,42 @@ export const deleteAccount = async (
     await user.deleteOne();
 
     sendSuccess(res, null, 'Account deleted successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  POST /api/auth/guest                                               */
+/* ------------------------------------------------------------------ */
+
+export const loginAsGuest = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { displayName } = req.body as { displayName: string };
+
+    const guestId = uuidv4();
+
+    const payload: GuestJwtPayload = {
+      id: guestId,
+      role: 'player',
+      isGuest: true,
+      displayName: displayName.trim(),
+    };
+    const token = generateToken(payload);
+
+    sendSuccess(
+      res,
+      {
+        user: { _id: guestId, displayName: displayName.trim(), isGuest: true, role: 'player' },
+        token,
+      },
+      'Guest login successful',
+      201,
+    );
   } catch (err) {
     next(err);
   }

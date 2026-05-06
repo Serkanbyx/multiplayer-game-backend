@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   register,
   login,
+  loginAsGuest,
   getMe,
   updateProfile,
   changePassword,
@@ -12,6 +13,7 @@ import { authLimiter } from '../middleware/rateLimiters.js';
 import {
   registerValidator,
   loginValidator,
+  guestLoginValidator,
   updateProfileValidator,
   changePasswordValidator,
   deleteAccountValidator,
@@ -22,6 +24,7 @@ const router = Router();
 
 router.post('/register', authLimiter, registerValidator, validate, register);
 router.post('/login', authLimiter, loginValidator, validate, login);
+router.post('/guest', authLimiter, guestLoginValidator, validate, loginAsGuest);
 
 router.get('/me', protect, registeredOnly, getMe);
 router.put('/me', protect, registeredOnly, updateProfileValidator, validate, updateProfile);

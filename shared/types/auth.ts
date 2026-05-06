@@ -1,12 +1,22 @@
-/** JWT payload: guest kullanıcılar sadece displayName taşır, kayıtlı kullanıcılar userId içerir */
-export type JwtPayload =
-  | { type: "guest"; guestId: string; displayName: string }
-  | { type: "registered"; userId: string; role: "user" | "admin" };
-
-/** Socket/request üzerinde taşınan kullanıcı bilgisi */
-export interface AuthUser {
+export type RegisteredJwtPayload = {
   id: string;
+  role: 'player' | 'admin';
+  isGuest: false;
+};
+
+export type GuestJwtPayload = {
+  id: string;
+  role: 'player';
+  isGuest: true;
   displayName: string;
-  role: "guest" | "user" | "admin";
+};
+
+export type JwtPayload = RegisteredJwtPayload | GuestJwtPayload;
+
+export type AuthUser = {
+  _id: string;
+  displayName: string;
+  role: 'player' | 'admin';
   isGuest: boolean;
-}
+  avatarUrl?: string;
+};

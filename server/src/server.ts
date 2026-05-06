@@ -11,6 +11,7 @@ import { redis } from './config/redis.js';
 import { sanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
 import { globalLimiter } from './middleware/rateLimiters.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import authRouter from './routes/authRoutes.js';
 
 const app = express();
 
@@ -49,12 +50,12 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// 11. Route placeholders (will be mounted in later steps)
-// app.use('/api/auth', authRouter);
-// app.use('/api/users', usersRouter);
-// app.use('/api/matches', matchesRouter);
-// app.use('/api/leaderboard', leaderboardRouter);
-// app.use('/api/admin', adminRouter);
+// 11. Routes
+app.use('/api/auth', authRouter);
+// app.use('/api/users', usersRouter);        // Step 5+
+// app.use('/api/matches', matchesRouter);    // Step 5+
+// app.use('/api/leaderboard', leaderboardRouter); // Step 5+
+// app.use('/api/admin', adminRouter);        // Step 5+
 
 // 12. Error handler (must be last)
 app.use(errorHandler);

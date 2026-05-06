@@ -1,4 +1,4 @@
-import type { AuthUser } from "@mpg/shared/types/auth.js";
+import type { AuthUser } from '@mpg/shared/types/auth.js';
 
 declare global {
   namespace Express {

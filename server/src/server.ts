@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import http from 'node:http';
+import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -38,7 +39,14 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // 8. Mongo sanitize (Express 5–safe)
 app.use(sanitizeMiddleware);
 
-// 9. Global rate limiter
+// 9. Static file serving (avatar uploads)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  maxAge: '7d',
+  dotfiles: 'deny',
+  index: false,
+}));
+
+// 10. Global rate limiter
 app.use('/api', globalLimiter);
 
 // 10. Health check

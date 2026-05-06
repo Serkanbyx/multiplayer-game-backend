@@ -1,4 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import User from '../models/User.js';
 import Match from '../models/Match.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
@@ -160,6 +162,79 @@ export const getUserMatches = async (
         totalPages: Math.ceil(total / limit),
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  POST /api/users/me/avatar — Upload avatar                         */
+/* ------------------------------------------------------------------ */
+
+const deleteFileIfExists = async (filePath: string): Promise<void> => {
+  try {
+    await fs.unlink(filePath);
+  } catch {
+    /* file may not exist — ignore */
+  }
+};
+
+export const uploadAvatarHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.file) {
+      sendError(res, 'No file uploaded', 400);
+      return;
+    }
+
+    const user = await User.findById(req.user!._id);
+    if (!user) {
+      sendError(res, 'User not found', 404);
+      return;
+    }
+
+    if (user.avatarUrl) {
+      const oldPath = path.join(process.cwd(), user.avatarUrl);
+      await deleteFileIfExists(oldPath);
+    }
+
+    user.avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    await user.save();
+
+    sendSuccess(res, { avatarUrl: user.avatarUrl }, 'Avatar uploaded');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  DELETE /api/users/me/avatar — Remove avatar                        */
+/* ------------------------------------------------------------------ */
+
+export const removeAvatar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const user = await User.findById(req.user!._id);
+    if (!user) {
+      sendError(res, 'User not found', 404);
+      return;
+    }
+
+    if (user.avatarUrl) {
+      const filePath = path.join(process.cwd(), user.avatarUrl);
+      await deleteFileIfExists(filePath);
+    }
+
+    user.avatarUrl = '';
+    await user.save();
+
+    sendSuccess(res, null, 'Avatar removed');
   } catch (err) {
     next(err);
   }

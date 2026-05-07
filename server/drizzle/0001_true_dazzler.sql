@@ -1,0 +1,2 @@
+ALTER TABLE "users" ALTER COLUMN "preferences" SET DEFAULT '{"theme":"system","fontSize":"medium","animations":true,"sounds":true,"soundVolume":0.7,"language":"en","notifications":{"matchInvite":true,"rematch":true},"privacy":{"showStats":true,"showOnLeaderboard":true}}'::jsonb;--> statement-breakpoint
+CREATE INDEX "matches_players_gin_idx" ON "matches" USING gin ("players");

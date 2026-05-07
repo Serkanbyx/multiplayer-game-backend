@@ -21,7 +21,7 @@ import {
 
 const router = Router();
 
-/* /me route'ları önce tanımlanmalı — yoksa ":username" parametresi "me" stringini yakalar */
+/* /me routes must be defined first — otherwise ":username" param captures the "me" string */
 router.get('/me', protect, registeredOnly, getMyProfile);
 router.patch('/me', protect, registeredOnly, updateProfileValidator, validate, updateMyProfile);
 router.post('/me/avatar', protect, registeredOnly, uploadLimiter, uploadAvatar, uploadAvatarHandler);

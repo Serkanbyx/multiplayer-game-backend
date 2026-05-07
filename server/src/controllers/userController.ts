@@ -15,9 +15,6 @@ import type { PublicUser, UserPreferences } from '@mpg/shared/types/user.js';
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
 
-const toIsoOrUndefined = (value: Date | null): string | undefined =>
-  value ? value.toISOString() : undefined;
-
 /* ------------------------------------------------------------------ */
 /*  GET /api/users/:username — Public profile                          */
 /* ------------------------------------------------------------------ */
@@ -210,6 +207,8 @@ export const getUserMatches = async (
         gameType: m.gameType,
         players: m.players,
         result: m.result,
+        moves: m.moves,
+        winnerUserId: m.winnerUserId,
         duration: m.duration,
         totalRounds: m.totalRounds,
         startedAt: m.startedAt.toISOString(),
@@ -223,8 +222,6 @@ export const getUserMatches = async (
         totalPages: Math.ceil(total / limit),
       },
     });
-
-    void toIsoOrUndefined;
   } catch (err) {
     next(err);
   }

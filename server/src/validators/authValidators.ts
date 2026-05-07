@@ -4,7 +4,7 @@ import { validationResult } from 'express-validator';
 import { sendError } from '../utils/apiResponse.js';
 
 /* ------------------------------------------------------------------ */
-/*  Genel validate middleware                                           */
+/*  General validate middleware                                         */
 /* ------------------------------------------------------------------ */
 
 export const validate = (

@@ -134,6 +134,7 @@ export const matches = pgTable(
     winnerIdx: index('matches_winner_idx').on(t.winnerUserId, t.createdAt),
     gameCreatedIdx: index('matches_game_created_idx').on(t.gameType, t.createdAt),
     roomCodeIdx: index('matches_room_code_idx').on(t.roomCode),
+    playersGinIdx: index('matches_players_gin_idx').using('gin', t.players),
   }),
 );
 

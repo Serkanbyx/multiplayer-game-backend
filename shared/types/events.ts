@@ -2,7 +2,7 @@ import type { Room, RoomPlayer } from "./room.js";
 import type { GameState, GameAction, GameType } from "./games.js";
 import type { AuthUser } from "./auth.js";
 
-/** Client → Server socket olayları */
+/** Client → Server socket events */
 export interface ClientToServerEvents {
   "room:create": (data: { gameType: GameType; isPrivate: boolean }, callback: (response: { success: boolean; room?: Room; error?: string }) => void) => void;
   "room:join": (data: { roomCode: string }, callback: (response: { success: boolean; room?: Room; error?: string }) => void) => void;
@@ -22,7 +22,7 @@ export interface ClientToServerEvents {
   "matchmaking:leave": () => void;
 }
 
-/** Server → Client socket olayları */
+/** Server → Client socket events */
 export interface ServerToClientEvents {
   "room:updated": (room: Room) => void;
   "room:player-joined": (player: RoomPlayer) => void;

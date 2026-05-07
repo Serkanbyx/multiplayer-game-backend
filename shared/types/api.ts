@@ -1,18 +1,18 @@
-/** Standart API yanıt sarmalayıcısı */
+/** Standard API response wrapper */
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
 }
 
-/** API hata yanıtı */
+/** API error response */
 export interface ApiError {
   success: false;
   message: string;
   errors?: Array<{ field: string; message: string }>;
 }
 
-/** Sayfalanmış veri yanıtı */
+/** Paginated data response */
 export interface Paginated<T> {
   items: T[];
   total: number;

@@ -27,6 +27,8 @@ export interface MatchRecord {
   gameType: GameType;
   players: MatchPlayerSnapshot[];
   result: MatchResult;
+  moves: MatchMove[];
+  winnerUserId: string | null;
   duration: number;
   totalRounds: number;
   startedAt: string;

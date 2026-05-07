@@ -1,6 +1,6 @@
 export type GameType = "tic-tac-toe" | "card-game";
 
-/** Tic-Tac-Toe hücre değeri: null = boş, "X" veya "O" */
+/** Tic-Tac-Toe cell value: null = empty, "X" or "O" */
 export type Cell = "X" | "O" | null;
 
 export interface Card {

@@ -31,7 +31,7 @@ export const paginationValidator: ValidationChain[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  PATCH /me — profil güncelleme (whitelist)                          */
+/*  PATCH /me — update profile (whitelist)                             */
 /* ------------------------------------------------------------------ */
 
 export const updateProfileValidator: ValidationChain[] = [
@@ -48,7 +48,7 @@ export const updateProfileValidator: ValidationChain[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  PATCH /me/preferences — tercih güncelleme                          */
+/*  PATCH /me/preferences — update preferences                         */
 /* ------------------------------------------------------------------ */
 
 export const preferencesValidator: ValidationChain[] = [

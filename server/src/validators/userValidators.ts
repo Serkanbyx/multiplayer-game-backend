@@ -46,3 +46,50 @@ export const updateProfileValidator: ValidationChain[] = [
     .isLength({ max: 200 })
     .withMessage('Bio must be at most 200 characters'),
 ];
+
+/* ------------------------------------------------------------------ */
+/*  PATCH /me/preferences — tercih güncelleme                          */
+/* ------------------------------------------------------------------ */
+
+export const preferencesValidator: ValidationChain[] = [
+  body('theme')
+    .optional()
+    .isIn(['light', 'dark', 'system'])
+    .withMessage('Theme must be light, dark or system'),
+  body('fontSize')
+    .optional()
+    .isIn(['small', 'medium', 'large'])
+    .withMessage('Font size must be small, medium or large'),
+  body('animations')
+    .optional()
+    .isBoolean()
+    .withMessage('Animations must be a boolean'),
+  body('sounds')
+    .optional()
+    .isBoolean()
+    .withMessage('Sounds must be a boolean'),
+  body('soundVolume')
+    .optional()
+    .isFloat({ min: 0, max: 1 })
+    .withMessage('Sound volume must be between 0 and 1'),
+  body('language')
+    .optional()
+    .isIn(['en'])
+    .withMessage('Unsupported language'),
+  body('notifications.matchInvite')
+    .optional()
+    .isBoolean()
+    .withMessage('notifications.matchInvite must be a boolean'),
+  body('notifications.rematch')
+    .optional()
+    .isBoolean()
+    .withMessage('notifications.rematch must be a boolean'),
+  body('privacy.showStats')
+    .optional()
+    .isBoolean()
+    .withMessage('privacy.showStats must be a boolean'),
+  body('privacy.showOnLeaderboard')
+    .optional()
+    .isBoolean()
+    .withMessage('privacy.showOnLeaderboard must be a boolean'),
+];

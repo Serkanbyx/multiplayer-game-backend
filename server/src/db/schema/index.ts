@@ -33,6 +33,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   fontSize: 'medium',
   animations: true,
   sounds: true,
+  soundVolume: 0.7,
   language: 'en',
   notifications: { matchInvite: true, rematch: true },
   privacy: { showStats: true, showOnLeaderboard: true },

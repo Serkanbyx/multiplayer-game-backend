@@ -3,6 +3,7 @@ import {
   getPublicProfile,
   getMyProfile,
   updateMyProfile,
+  updateMyPreferences,
   getUserMatches,
   uploadAvatarHandler,
   removeAvatar,
@@ -15,6 +16,7 @@ import {
   usernameParamValidator,
   paginationValidator,
   updateProfileValidator,
+  preferencesValidator,
 } from '../validators/userValidators.js';
 
 const router = Router();
@@ -24,6 +26,7 @@ router.get('/me', protect, registeredOnly, getMyProfile);
 router.patch('/me', protect, registeredOnly, updateProfileValidator, validate, updateMyProfile);
 router.post('/me/avatar', protect, registeredOnly, uploadLimiter, uploadAvatar, uploadAvatarHandler);
 router.delete('/me/avatar', protect, registeredOnly, removeAvatar);
+router.patch('/me/preferences', protect, registeredOnly, preferencesValidator, validate, updateMyPreferences);
 
 router.get('/:username', optionalAuth, usernameParamValidator, validate, getPublicProfile);
 router.get('/:username/matches', optionalAuth, usernameParamValidator, paginationValidator, validate, getUserMatches);

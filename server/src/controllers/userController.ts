@@ -1,16 +1,16 @@
 import type { Request, Response, NextFunction } from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { sql, desc } from 'drizzle-orm';
+import { eq, sql, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { matches } from '../db/schema/index.js';
+import { matches, users } from '../db/schema/index.js';
 import {
   findPublicById,
   findPublicByUsername,
   updateProfileById,
 } from '../services/userService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
-import type { PublicUser } from '@mpg/shared/types/user.js';
+import type { PublicUser, UserPreferences } from '@mpg/shared/types/user.js';
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
@@ -97,6 +97,64 @@ export const updateMyProfile = async (
 
     const user = await updateProfileById(req.user!._id, { displayName, bio });
     sendSuccess(res, { user }, 'Profile updated');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  PATCH /api/users/me/preferences — Update own preferences           */
+/* ------------------------------------------------------------------ */
+
+const ALLOWED_TOP: Array<keyof UserPreferences> = [
+  'theme', 'fontSize', 'animations', 'sounds', 'soundVolume', 'language',
+];
+
+export const updateMyPreferences = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ preferences: users.preferences })
+        .from(users)
+        .where(eq(users.id, req.user!._id))
+        .limit(1);
+
+      if (!row) {
+        sendError(res, 'User not found', 404);
+        return null;
+      }
+
+      const merged = { ...row.preferences } as Record<string, unknown>;
+
+      for (const [key, value] of Object.entries(req.body)) {
+        if (key === 'notifications' || key === 'privacy') {
+          if (value && typeof value === 'object') {
+            merged[key] = {
+              ...(merged[key] as object),
+              ...(value as object),
+            };
+          }
+        } else if (ALLOWED_TOP.includes(key as keyof UserPreferences)) {
+          merged[key] = value;
+        }
+      }
+
+      const [updated] = await tx
+        .update(users)
+        .set({ preferences: merged as unknown as UserPreferences })
+        .where(eq(users.id, req.user!._id))
+        .returning({ preferences: users.preferences });
+
+      return updated!.preferences;
+    });
+
+    if (result !== null) {
+      sendSuccess(res, result, 'Preferences updated');
+    }
   } catch (err) {
     next(err);
   }

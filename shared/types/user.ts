@@ -20,6 +20,7 @@ export interface UserPreferences {
   fontSize: 'small' | 'medium' | 'large';
   animations: boolean;
   sounds: boolean;
+  soundVolume: number;
   language: string;
   notifications: NotificationPreferences;
   privacy: PrivacyPreferences;

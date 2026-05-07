@@ -1,9 +1,23 @@
 import type { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import User, { type IUser } from '../models/User.js';
+import {
+  findExistingByUsernameOrEmail,
+  findByEmailWithPassword,
+  findByIdWithPassword,
+  findPublicById,
+  createUser,
+  verifyPassword,
+  updatePasswordById,
+  updateLastLogin,
+  updateProfileById,
+  deleteUserById,
+} from '../services/userService.js';
 import { generateToken } from '../utils/generateToken.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
-import type { RegisteredJwtPayload, GuestJwtPayload } from '@mpg/shared/types/auth.js';
+import type {
+  RegisteredJwtPayload,
+  GuestJwtPayload,
+} from '@mpg/shared/types/auth.js';
 
 /* ------------------------------------------------------------------ */
 /*  POST /api/auth/register                                            */
@@ -15,29 +29,29 @@ export const register = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { username, email, password, displayName } = req.body as Pick<
-      IUser,
-      'username' | 'email' | 'password' | 'displayName'
-    >;
+    const { username, email, password, displayName } = req.body as {
+      username: string;
+      email: string;
+      password: string;
+      displayName: string;
+    };
 
-    const existing = await User.findOne({
-      $or: [{ email }, { username }],
-    });
+    const existing = await findExistingByUsernameOrEmail(username, email);
     if (existing) {
       sendError(res, 'Username or email already in use', 409);
       return;
     }
 
-    const user = await User.create({ username, email, password, displayName });
+    const user = await createUser({ username, email, password, displayName });
 
     const payload: RegisteredJwtPayload = {
-      id: String(user._id),
+      id: user.id,
       role: user.role,
       isGuest: false,
     };
     const token = generateToken(payload);
 
-    sendSuccess(res, { user: user.toJSON(), token }, 'Registration successful', 201);
+    sendSuccess(res, { user, token }, 'Registration successful', 201);
   } catch (err) {
     next(err);
   }
@@ -53,31 +67,31 @@ export const login = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { email, password } = req.body as Pick<IUser, 'email' | 'password'>;
+    const { email, password } = req.body as { email: string; password: string };
 
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) {
+    const userRow = await findByEmailWithPassword(email);
+    if (!userRow) {
       sendError(res, 'Invalid email or password', 401);
       return;
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await verifyPassword(password, userRow.password);
     if (!isMatch) {
       sendError(res, 'Invalid email or password', 401);
       return;
     }
 
-    user.lastLoginAt = new Date();
-    await user.save();
+    await updateLastLogin(userRow.id);
 
     const payload: RegisteredJwtPayload = {
-      id: String(user._id),
-      role: user.role,
+      id: userRow.id,
+      role: userRow.role,
       isGuest: false,
     };
     const token = generateToken(payload);
 
-    sendSuccess(res, { user: user.toJSON(), token }, 'Login successful');
+    const { password: _omit, ...publicUser } = userRow;
+    sendSuccess(res, { user: publicUser, token }, 'Login successful');
   } catch (err) {
     next(err);
   }
@@ -93,12 +107,12 @@ export const getMe = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const user = await User.findById(req.user!._id);
+    const user = await findPublicById(req.user!._id);
     if (!user) {
       sendError(res, 'User not found', 404);
       return;
     }
-    sendSuccess(res, { user: user.toJSON() });
+    sendSuccess(res, { user });
   } catch (err) {
     next(err);
   }
@@ -114,23 +128,19 @@ export const updateProfile = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { displayName, bio, avatarUrl } = req.body as Pick<
-      IUser,
-      'displayName' | 'bio' | 'avatarUrl'
-    >;
+    const { displayName, bio, avatarUrl } = req.body as {
+      displayName?: string;
+      bio?: string;
+      avatarUrl?: string;
+    };
 
-    const user = await User.findById(req.user!._id);
-    if (!user) {
-      sendError(res, 'User not found', 404);
-      return;
-    }
+    const user = await updateProfileById(req.user!._id, {
+      displayName,
+      bio,
+      avatarUrl,
+    });
 
-    if (displayName !== undefined) user.displayName = displayName;
-    if (bio !== undefined) user.bio = bio;
-    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
-
-    await user.save();
-    sendSuccess(res, { user: user.toJSON() }, 'Profile updated');
+    sendSuccess(res, { user }, 'Profile updated');
   } catch (err) {
     next(err);
   }
@@ -151,21 +161,19 @@ export const changePassword = async (
       newPassword: string;
     };
 
-    const user = await User.findById(req.user!._id).select('+password');
-    if (!user) {
+    const row = await findByIdWithPassword(req.user!._id);
+    if (!row) {
       sendError(res, 'User not found', 404);
       return;
     }
 
-    const isMatch = await user.comparePassword(currentPassword);
+    const isMatch = await verifyPassword(currentPassword, row.password);
     if (!isMatch) {
       sendError(res, 'Current password is incorrect', 401);
       return;
     }
 
-    user.password = newPassword;
-    await user.save();
-
+    await updatePasswordById(req.user!._id, newPassword);
     sendSuccess(res, null, 'Password changed successfully');
   } catch (err) {
     next(err);
@@ -184,20 +192,19 @@ export const deleteAccount = async (
   try {
     const { password } = req.body as { password: string };
 
-    const user = await User.findById(req.user!._id).select('+password');
-    if (!user) {
+    const row = await findByIdWithPassword(req.user!._id);
+    if (!row) {
       sendError(res, 'User not found', 404);
       return;
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await verifyPassword(password, row.password);
     if (!isMatch) {
       sendError(res, 'Password is incorrect', 401);
       return;
     }
 
-    await user.deleteOne();
-
+    await deleteUserById(req.user!._id);
     sendSuccess(res, null, 'Account deleted successfully');
   } catch (err) {
     next(err);
@@ -215,21 +222,26 @@ export const loginAsGuest = async (
 ): Promise<void> => {
   try {
     const { displayName } = req.body as { displayName: string };
-
     const guestId = uuidv4();
+    const trimmed = displayName.trim();
 
     const payload: GuestJwtPayload = {
       id: guestId,
       role: 'player',
       isGuest: true,
-      displayName: displayName.trim(),
+      displayName: trimmed,
     };
     const token = generateToken(payload);
 
     sendSuccess(
       res,
       {
-        user: { _id: guestId, displayName: displayName.trim(), isGuest: true, role: 'player' },
+        user: {
+          _id: guestId,
+          displayName: trimmed,
+          isGuest: true,
+          role: 'player',
+        },
         token,
       },
       'Guest login successful',

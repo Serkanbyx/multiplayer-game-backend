@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Shared TypeScript types for multiplayer game platform",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
     "typescript": "^6.0.3"
   }

@@ -1,7 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { eq } from 'drizzle-orm';
 import { env } from '../config/env.js';
-import User from '../models/User.js';
+import { db } from '../db/index.js';
+import { users } from '../db/schema/index.js';
 import { sendError } from '../utils/apiResponse.js';
 import type { JwtPayload, AuthUser } from '@mpg/shared/types/auth.js';
 
@@ -23,11 +25,21 @@ const resolveUser = async (decoded: JwtPayload): Promise<AuthUser | null> => {
     };
   }
 
-  const user = await User.findById(decoded.id).select('displayName role avatarUrl').lean();
+  const [user] = await db
+    .select({
+      id: users.id,
+      displayName: users.displayName,
+      role: users.role,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(users)
+    .where(eq(users.id, decoded.id))
+    .limit(1);
+
   if (!user) return null;
 
   return {
-    _id: String(user._id),
+    _id: user.id,
     displayName: user.displayName,
     role: user.role,
     isGuest: false,
@@ -36,8 +48,8 @@ const resolveUser = async (decoded: JwtPayload): Promise<AuthUser | null> => {
 };
 
 /**
- * Token doğrular, req.user'a atar.
- * Geçersiz veya eksik token → 401.
+ * Verifies token and attaches user to req.user.
+ * Missing or invalid token → 401.
  */
 export const protect = async (
   req: Request,
@@ -65,8 +77,8 @@ export const protect = async (
 };
 
 /**
- * Token varsa doğrular, yoksa sessizce geçer.
- * Hata durumunda req.user = undefined olarak bırakır.
+ * Verifies token if present; silently passes through otherwise.
+ * Leaves req.user undefined on any failure.
  */
 export const optionalAuth = async (
   req: Request,
@@ -86,15 +98,12 @@ export const optionalAuth = async (
       req.user = authUser;
     }
   } catch {
-    // Geçersiz token — sessizce geç
+    /* Invalid token — fall through anonymously */
   }
 
   next();
 };
 
-/**
- * Admin rolü gerektirir. protect'ten sonra kullanılmalı.
- */
 export const adminOnly = (
   req: Request,
   res: Response,
@@ -107,9 +116,6 @@ export const adminOnly = (
   next();
 };
 
-/**
- * Kayıtlı (guest olmayan) kullanıcı gerektirir. protect'ten sonra kullanılmalı.
- */
 export const registeredOnly = (
   req: Request,
   res: Response,

@@ -25,8 +25,9 @@ export interface UserPreferences {
   privacy: PrivacyPreferences;
 }
 
-/** Mongoose-bağımsız kullanıcı arayüzü — client tarafında yeniden kullanılır */
+/** Backend-agnostic user shape — consumed by client and `shared/types`. */
 export interface IUserBase {
+  id: string;
   username: string;
   email: string;
   displayName: string;
@@ -42,8 +43,9 @@ export interface IUserBase {
   updatedAt: string;
 }
 
-/** Herkese açık kullanıcı profili — privacy.showStats false ise stats alanları gönderilmez */
+/** Public profile — when `privacy.showStats` is `false`, stats fields are omitted by the API. */
 export interface PublicUser {
+  id: string;
   username: string;
   displayName: string;
   avatarUrl: string;
@@ -54,10 +56,9 @@ export interface PublicUser {
   statsByGame?: Record<string, GameStats>;
 }
 
-/** Kullanıcının kendi profil bilgileri (email dahil) */
+/** Authenticated user's own profile (includes email + preferences). */
 export interface OwnUser extends PublicUser {
   email: string;
-  role: 'player' | 'admin';
   isGuest: boolean;
   preferences: UserPreferences;
   statsByGame: Record<string, GameStats>;

@@ -1,10 +1,10 @@
 # Multiplayer Game Backend — Step-by-Step Build Guide
 
 > **Project Summary:**
-> A real-time multiplayer game platform built on Node.js + Socket.io with Redis as the live game-state store and MongoDB as the persistent user/leaderboard store. Two roles (Player, Admin) and two participation modes (registered + guest) are supported. Players can create/join rooms with a UUID code, auto-match through a queue, spectate live games, chat in-room, request rematches, and track stats on a global leaderboard. The system ships with two games — TicTacToe (2 players) and a simple 4-player card game — implemented behind a GameFactory pattern so additional games can be plugged in without touching transport, room, or state code. All game logic runs server-side; the client is a thin renderer that forwards intents (e.g., "play cell index 4") and renders the authoritative state pushed back over Socket.io. Security layers include JWT-authenticated WebSocket handshakes, helmet, strict CORS, per-route rate limiting, mass-assignment protection, NoSQL-injection sanitization, RBAC guards, and admin self-protection.
+> A real-time multiplayer game platform built on Node.js + Socket.io with Redis as the live game-state store and Neon (serverless PostgreSQL) accessed through Drizzle ORM as the persistent user/leaderboard store. Two roles (Player, Admin) and two participation modes (registered + guest) are supported. Players can create/join rooms with a UUID code, auto-match through a queue, spectate live games, chat in-room, request rematches, and track stats on a global leaderboard. The system ships with two games — TicTacToe (2 players) and a simple 4-player card game — implemented behind a GameFactory pattern so additional games can be plugged in without touching transport, room, or state code. All game logic runs server-side; the client is a thin renderer that forwards intents (e.g., "play cell index 4") and renders the authoritative state pushed back over Socket.io. Security layers include JWT-authenticated WebSocket handshakes, helmet, strict CORS, per-route rate limiting, mass-assignment protection, parameterized SQL queries, RBAC guards, and admin self-protection.
 
 > Each step below is a self-contained prompt. Execute them in order.
-> Stack: **TypeScript 5** end-to-end, React 19 + Vite, Node 20 LTS, Express 5, Socket.io 4, MongoDB/Mongoose 9, Redis (ioredis), JWT, TailwindCSS v4, React Router v7, Axios, socket.io-client.
+> Stack: **TypeScript 5** end-to-end, React 19 + Vite, Node 20 LTS, Express 5, Socket.io 4, **Neon (PostgreSQL serverless) + Drizzle ORM**, Redis (ioredis), JWT, TailwindCSS v4, React Router v7, Axios, socket.io-client.
 > Shared types live in a top-level `shared/` package consumed by both `server/` and `client/` so socket event payloads, game state shapes, JWT claims, and REST responses are statically guaranteed across the wire.
 
 ---
@@ -13,7 +13,7 @@
 
 **Phase 1 — Backend Foundation**
 - STEP 1 — Project Scaffolding & Dependency Setup
-- STEP 2 — Environment Configuration, MongoDB & Redis Connection
+- STEP 2 — Environment Configuration, Neon Postgres (Drizzle) & Redis Connection
 - STEP 3 — User Model, Auth System & Admin Seed
 - STEP 4 — Guest Authentication Flow
 
@@ -86,7 +86,7 @@
 - STEP 52 — README & Architecture Documentation
 - STEP 53 — CI/CD (GitHub Actions: typecheck + lint + test on PR)
 - STEP 54 — Code Cleanup & Pre-Deploy Review
-- STEP 55 — Production Deployment (Render + Netlify + Redis Cloud + MongoDB Atlas + optional Sentry)
+- STEP 55 — Production Deployment (Render + Netlify + Redis Cloud + Neon Postgres + optional Sentry)
 
 ---
 
@@ -130,18 +130,22 @@ shared/
 server/
 ├── src/
 │   ├── config/
-│   │   ├── db.ts                      # MongoDB connectDB
 │   │   ├── redis.ts                   # ioredis singleton + duplicate() pub/sub
 │   │   └── env.ts                     # Centralized env access + zod-style runtime validation
+│   ├── db/
+│   │   ├── index.ts                   # Drizzle client (postgres-js) + typed `db` export
+│   │   ├── migrate.ts                 # Standalone migration runner (`npm run db:migrate`)
+│   │   └── schema/
+│   │       └── index.ts               # All pgTable definitions (users + matches) in one file
+│   │                                  # — drizzle-kit's CJS loader cannot resolve cross-file
+│   │                                  #   `.js` imports between schema files, so we keep them
+│   │                                  #   colocated here and split only if the file grows beyond ~300 lines.
 │   ├── middleware/
 │   │   ├── authMiddleware.ts          # protect, optionalAuth, adminOnly, registeredOnly
 │   │   ├── errorHandler.ts
 │   │   ├── rateLimiters.ts            # global, auth, admin, upload
-│   │   ├── sanitizeMiddleware.ts      # Express 5–safe mongo-sanitize
+│   │   ├── sanitizeMiddleware.ts      # input shape sanitization (defense-in-depth even with parameterized SQL)
 │   │   └── uploadMiddleware.ts        # multer config
-│   ├── models/
-│   │   ├── User.ts                    # IUser interface + Schema<IUser>
-│   │   └── Match.ts                   # IMatch interface + Schema<IMatch>
 │   ├── controllers/
 │   │   ├── authController.ts
 │   │   ├── userController.ts
@@ -170,7 +174,8 @@ server/
 │   ├── services/
 │   │   ├── roomService.ts             # Redis CRUD for rooms
 │   │   ├── matchmakingService.ts
-│   │   └── matchService.ts            # MongoDB match history writes
+│   │   ├── matchService.ts            # Postgres match-history + atomic stat increments
+│   │   └── userService.ts             # createUser (with bcrypt), changePassword (replaces Mongoose pre-save hooks)
 │   ├── utils/
 │   │   ├── generateToken.ts
 │   │   ├── generateRoomCode.ts
@@ -189,8 +194,13 @@ server/
 │   ├── seed/
 │   │   └── seedAdmin.ts
 │   └── server.ts                      # entry: HTTP + Socket.io bootstrap
+├── drizzle/                           # generated SQL migrations (committed)
+│   ├── 0000_initial.sql
+│   ├── 0001_add_xxx.sql
+│   └── meta/                          # snapshot history (managed by drizzle-kit)
 ├── uploads/                           # local avatar storage (gitignored)
 ├── dist/                              # tsc output (gitignored)
+├── drizzle.config.ts                  # drizzle-kit config: schema path + migration dir + dialect
 ├── .env
 ├── .env.example
 ├── .gitignore
@@ -261,9 +271,11 @@ client/
 └── package.json
 ```
 
-**Server dependencies (production):** `express`, `socket.io`, `mongoose`, `ioredis`, `jsonwebtoken`, `bcryptjs`, `dotenv`, `cors`, `helmet`, `express-rate-limit`, `express-mongo-sanitize`, `express-validator`, `multer`, `uuid`.
+**Server dependencies (production):** `express`, `socket.io`, `drizzle-orm`, `postgres` (driver), `ioredis`, `jsonwebtoken`, `bcryptjs`, `dotenv`, `cors`, `helmet`, `express-rate-limit`, `express-validator`, `multer`, `uuid`, `pino`.
 
-**Server dependencies (dev):** `typescript`, `tsx`, `@types/node`, `@types/express`, `@types/jsonwebtoken`, `@types/bcryptjs`, `@types/cors`, `@types/multer`, `@types/uuid`, `@types/express-mongo-sanitize`.
+**Server dependencies (dev):** `typescript`, `tsx`, `drizzle-kit`, `@types/node`, `@types/express`, `@types/jsonwebtoken`, `@types/bcryptjs`, `@types/cors`, `@types/multer`, `@types/uuid`, `pino-pretty`.
+
+> **Note:** `mongoose` and `express-mongo-sanitize` are **not** used. Drizzle's parameterized queries protect against SQL injection by default; `hpp` and `mongo-sanitize` are unnecessary. The `sanitizeMiddleware.ts` (Step 2) instead applies a lightweight type-shape check on `req.body` to reject pathological structures.
 
 **Client dependencies (production):** `react`, `react-dom`, `react-router-dom`, `axios`, `socket.io-client`, `react-hot-toast`, `lucide-react`.
 
@@ -349,6 +361,10 @@ client/
 | `build` | `tsc -p tsconfig.json` | Compile TS → `dist/` |
 | `start` | `node dist/src/server.js` | Production runtime (Render uses this) |
 | `typecheck` | `tsc --noEmit` | Standalone type check |
+| `db:generate` | `drizzle-kit generate` | Generate SQL migration files from schema diffs |
+| `db:migrate` | `tsx src/db/migrate.ts` | Apply pending migrations to the configured database |
+| `db:studio` | `drizzle-kit studio` | Open the local Drizzle Studio web UI for inspecting data |
+| `db:push` | `drizzle-kit push` | (Dev only) Push schema directly without migration files |
 | `seed:admin` | `tsx src/seed/seedAdmin.ts` | Seed admin user |
 
 **npm scripts (`client/package.json`):**
@@ -389,9 +405,9 @@ server/uploads/
 
 ---
 
-## STEP 2 — Environment Configuration, MongoDB & Redis Connection
+## STEP 2 — Environment Configuration, Neon Postgres (Drizzle) & Redis Connection
 
-Build the environment access layer, connect MongoDB through Mongoose, connect Redis through ioredis, and wire all global Express middleware in the correct order.
+Build the environment access layer, connect to Neon Postgres through Drizzle ORM (using the `postgres` driver), connect Redis through ioredis, and wire all global Express middleware in the correct order.
 
 **`config/env.ts`** — central env reader with runtime validation. Exports a typed `env` object so consumers get autocomplete and compile-time guarantees:
 
@@ -399,7 +415,7 @@ Build the environment access layer, connect MongoDB through Mongoose, connect Re
 |---|---|---|---|
 | `NODE_ENV` | yes | `development` | `development`/`production`/`test` |
 | `PORT` | yes | `5000` | positive integer |
-| `MONGO_URI` | yes | — | non-empty string |
+| `DATABASE_URL` | yes | — | Postgres connection string (Neon: `postgresql://user:pass@host/db?sslmode=require`) |
 | `REDIS_URL` | yes | — | non-empty string (e.g. `redis://default:pwd@host:port`) |
 | `JWT_SECRET` | yes | — | min 32 chars in production |
 | `JWT_EXPIRES_IN` | no | `7d` | string |
@@ -412,10 +428,58 @@ Build the environment access layer, connect MongoDB through Mongoose, connect Re
 
 On startup, if `NODE_ENV === 'production'` and `JWT_SECRET.length < 32`, throw and exit immediately.
 
-**`config/db.ts`** — `connectDB(): Promise<void>`:
-- `mongoose.set('strictQuery', true)`.
-- `await mongoose.connect(env.MONGO_URI)` — no deprecated options.
-- Log `MongoDB connected: <host>` on success; on error, log and `process.exit(1)`.
+**`db/index.ts`** — Drizzle client, typed:
+
+```ts
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { env } from '../config/env.js';
+import * as schema from './schema/index.js';
+
+const client = postgres(env.DATABASE_URL, {
+  max: env.NODE_ENV === 'production' ? 10 : 5,   // Neon free tier: keep pool small
+  idle_timeout: 20,                                // close idle conns to free Neon compute hours
+  connect_timeout: 10,
+  prepare: false,                                  // required for Neon's transaction-mode pooler
+});
+
+export const db = drizzle(client, { schema, logger: env.LOG_LEVEL === 'debug' });
+export const dbClient = client;                    // raw access for graceful shutdown
+```
+
+**`db/migrate.ts`** — runs pending migrations on startup or via `npm run db:migrate`:
+
+```ts
+import { drizzle } from 'drizzle-orm/postgres-js';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import postgres from 'postgres';
+import { env } from '../config/env.js';
+
+const client = postgres(env.DATABASE_URL, { max: 1 });
+await migrate(drizzle(client), { migrationsFolder: 'drizzle' });
+await client.end();
+console.log('Migrations applied');
+```
+
+**`drizzle.config.ts`** (server root):
+
+```ts
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  schema: './src/db/schema/index.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  dbCredentials: { url: process.env.DATABASE_URL! },
+  verbose: true,
+  strict: true,
+});
+```
+
+**Connection lifecycle:**
+- App starts → `db` is lazy-imported when first query runs (postgres-js connects on first query).
+- Health check (`GET /api/health`) executes `SELECT 1` to verify connectivity.
+- Graceful shutdown (SIGTERM): `await dbClient.end({ timeout: 5 })`.
 
 **`config/redis.ts`** — singleton ioredis client, typed:
 - `new Redis(env.REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 3, enableReadyCheck: true })`.
@@ -431,25 +495,43 @@ On startup, if `NODE_ENV === 'production'` and `JWT_SECRET.length < 32`, throw a
 5. `app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true, methods: ['GET','POST','PUT','PATCH','DELETE'] }))`.
 6. `app.use(express.json({ limit: '10kb' }))`.
 7. `app.use(express.urlencoded({ extended: true, limit: '10kb' }))`.
-8. `app.use(sanitizeMiddleware)` — custom Express 5–safe mongo-sanitize (see snippet).
+8. `app.use(sanitizeMiddleware)` — strips prototype-pollution keys and clamps depth (see snippet).
 9. `app.use('/api', globalLimiter)`.
 10. `GET /api/health` → `{ status: 'ok', uptime, db: <state>, redis: <state> }`.
 11. Mount routers (`/api/auth`, `/api/users`, `/api/matches`, `/api/leaderboard`, `/api/admin`).
 12. `app.use(errorHandler)` last.
-13. Create HTTP server with `http.createServer(app)`, attach `socket.io` (Step 11), `await connectDB()`, then `httpServer.listen(env.PORT)`.
+13. Create HTTP server with `http.createServer(app)`, attach `socket.io` (Step 11). The Drizzle client is imported lazily and connects on first query. In production startup, optionally `await migrate(...)` to apply pending migrations before listening (or run migrations as a separate Render predeploy step — see Step 55). Finally `httpServer.listen(env.PORT)`.
 
-**Express 5–safe mongo-sanitize middleware (`middleware/sanitizeMiddleware.ts`):**
+**Input shape sanitization (`middleware/sanitizeMiddleware.ts`)** — defense-in-depth even though Drizzle uses parameterized queries. Strips `__proto__`/`constructor`/`prototype` keys and rejects deeply-nested objects:
 
 ```ts
 import type { Request, Response, NextFunction } from 'express';
-import mongoSanitize from 'express-mongo-sanitize';
+
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const MAX_DEPTH = 6;
+
+const sanitize = (value: unknown, depth = 0): unknown => {
+  if (depth > MAX_DEPTH) return undefined;
+  if (Array.isArray(value)) return value.map((v) => sanitize(v, depth + 1));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (FORBIDDEN_KEYS.has(k)) continue;
+      out[k] = sanitize(v, depth + 1);
+    }
+    return out;
+  }
+  return value;
+};
 
 export const sanitizeMiddleware = (req: Request, _res: Response, next: NextFunction): void => {
-  if (req.body) mongoSanitize.sanitize(req.body);
-  if (req.params) mongoSanitize.sanitize(req.params);
+  if (req.body) req.body = sanitize(req.body);
+  if (req.params) req.params = sanitize(req.params) as typeof req.params;
   next();
 };
 ```
+
+> **Why no `express-mongo-sanitize`?** It targets MongoDB's `$`/`.` operator injection. Drizzle generates parameterized SQL via `postgres-js`; user input is bound, never interpolated. SQL injection is structurally prevented. The middleware above blocks prototype-pollution attacks and deeply-nested DoS payloads instead.
 
 **`middleware/rateLimiters.ts`** — separate instances:
 
@@ -460,12 +542,14 @@ export const sanitizeMiddleware = (req: Request, _res: Response, next: NextFunct
 | `adminLimiter` | 5 min | 60 | `/api/admin/*` |
 | `uploadLimiter` | 10 min | 20 | `/api/users/me/avatar` |
 
-**`.env.example`** must list every key from the table above with safe placeholders (e.g. `MONGO_URI=mongodb://localhost:27017/multiplayer_game`, `JWT_SECRET=replace_with_a_secret_of_at_least_32_chars`).
+**`.env.example`** must list every key from the table above with safe placeholders (e.g. `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/multiplayer_game`, `JWT_SECRET=replace_with_a_secret_of_at_least_32_chars`). For Neon, the URL ends with `?sslmode=require`. For local development, run Postgres in Docker: `docker run -d --name mpg-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16-alpine`.
 
 **SECURITY:**
 - `helmet`, `cors` strict origin, `x-powered-by` disabled, body size capped at 10 KB.
-- `mongoSanitize.sanitize()` applied to `req.body` and `req.params` only — `req.query` is read-only in Express 5; `app.use(mongoSanitize())` would crash the server.
-- `hpp` is **not** installed (incompatible with Express 5).
+- Custom `sanitizeMiddleware` strips `__proto__`/`constructor`/`prototype` keys (prototype-pollution prevention) and clamps object depth to 6.
+- SQL injection structurally prevented by Drizzle + `postgres-js` parameterized queries — user input is **never** string-concatenated into SQL.
+- Drizzle pool capped at 10 (production) / 5 (dev) connections to stay under Neon free tier limits.
+- `hpp` and `express-mongo-sanitize` are **not** installed (incompatible with Express 5 / unnecessary for Postgres).
 - `JWT_SECRET` length check enforced in production.
 - Rate limiters scoped per route group; auth limiter is tightest.
 - Health check leaks no internal info beyond connection state booleans.
@@ -476,51 +560,134 @@ export const sanitizeMiddleware = (req: Request, _res: Response, next: NextFunct
 
 Implement the registered-user authentication path. (Guest path is added in Step 4.)
 
-**`models/User.ts`** — declare `IUser` interface first, then `Schema<IUser>`. The interface is also exported via `shared/types/user.ts` (without Mongoose-specific fields) so the client can reuse it. Fields:
+**`db/schema/index.ts`** — Drizzle `pgTable` definitions live in a single file (both `users` and `matches`). Types are inferred via `$type<...>()` casts where SQL nullability isn't expressive enough (e.g., jsonb columns). The inferred row type is exported as `UserRow` and re-used in `shared/types/user.ts` (minus DB-only fields like `password`).
 
-| Field | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `username` | String | yes | — | unique, lowercase, trim, 3–20 chars, regex `^[a-z0-9_]+$` |
-| `email` | String | yes | — | unique, lowercase, trim, valid email |
-| `password` | String | yes | — | min 8 chars, `select: false` |
-| `displayName` | String | yes | — | 2–30 chars, trim |
-| `avatarUrl` | String | no | `''` | |
-| `role` | String | yes | `player` | enum: `player`, `admin` |
-| `isGuest` | Boolean | yes | `false` | always `false` for this model path |
-| `bio` | String | no | `''` | max 200 chars |
-| `stats` | Subdoc | yes | `{ wins:0, losses:0, draws:0, gamesPlayed:0 }` | per-game and total |
-| `statsByGame` | Map<String, Subdoc> | no | `{}` | key = `tictactoe`/`cardgame`, value = `{wins, losses, draws, gamesPlayed}` |
-| `preferences` | Subdoc | yes | defaults below | |
-| `lastLoginAt` | Date | no | — | |
-| `createdAt`/`updatedAt` | timestamps | — | — | |
+> **Note on file layout:** drizzle-kit's CJS loader cannot resolve cross-file `.js` imports between schema files (e.g., `matches.ts` importing `users` from `./users.js`), so we keep both tables colocated in `schema/index.ts`. Split only if the file grows past ~300 lines, and at that point use a per-table `drizzle.config.ts` workaround.
 
-**`preferences` subdocument:**
+**Columns:**
+
+| Column | SQL Type | Constraints / Default | Notes |
+|---|---|---|---|
+| `id` | `uuid` | PK, `defaultRandom()` | replaces Mongo ObjectId |
+| `username` | `varchar(20)` | unique, not null | lowercase, regex enforced at validator layer |
+| `email` | `varchar(255)` | unique, not null | normalized lowercase |
+| `password` | `varchar(255)` | not null | bcrypt hash; **never** selected in default queries via `usersPublicView` (see below) |
+| `displayName` | `varchar(30)` | not null | |
+| `avatarUrl` | `varchar(500)` | default `''`, not null | |
+| `role` | `varchar(10)` | `$type<'player' \| 'admin'>()`, default `'player'`, not null | enforced at app layer; consider Postgres `enum` for stronger guarantee |
+| `isGuest` | `boolean` | default `false`, not null | always `false` here; guests have no row |
+| `bio` | `varchar(200)` | default `''`, not null | |
+| `stats` | `jsonb` | `$type<UserStats>()`, default `{ wins:0, losses:0, draws:0, gamesPlayed:0 }`, not null | |
+| `statsByGame` | `jsonb` | `$type<Record<GameType, UserStats>>()`, default `{}`, not null | |
+| `preferences` | `jsonb` | `$type<UserPreferences>()`, not null | default applied at insert via service |
+| `lastLoginAt` | `timestamptz` | nullable | |
+| `createdAt` | `timestamptz` | `defaultNow()`, not null | |
+| `updatedAt` | `timestamptz` | `defaultNow().$onUpdate(() => new Date())`, not null | auto-updated on every UPDATE |
+
+**`UserPreferences` shape** (in `shared/types/user.ts`, stored as jsonb):
 
 | Field | Type | Default | Enum / Range |
 |---|---|---|---|
-| `theme` | String | `system` | `light`/`dark`/`system` |
-| `fontSize` | String | `medium` | `small`/`medium`/`large` |
-| `animations` | Boolean | `true` | — |
-| `sounds` | Boolean | `true` | — |
-| `language` | String | `en` | `en` |
-| `notifications.matchInvite` | Boolean | `true` | — |
-| `notifications.rematch` | Boolean | `true` | — |
-| `privacy.showStats` | Boolean | `true` | — |
-| `privacy.showOnLeaderboard` | Boolean | `true` | — |
+| `theme` | `'light' \| 'dark' \| 'system'` | `'system'` | |
+| `fontSize` | `'small' \| 'medium' \| 'large'` | `'medium'` | |
+| `animations` | `boolean` | `true` | |
+| `sounds` | `boolean` | `true` | |
+| `soundVolume` | `number` | `0.7` | 0–1 |
+| `language` | `'en'` | `'en'` | |
+| `notifications.matchInvite` | `boolean` | `true` | |
+| `notifications.rematch` | `boolean` | `true` | |
+| `privacy.showStats` | `boolean` | `true` | |
+| `privacy.showOnLeaderboard` | `boolean` | `true` | |
 
-**Indexes:** `{ username: 1 }` unique, `{ email: 1 }` unique, `{ 'stats.wins': -1 }` for leaderboard.
+**Indexes** (declared in the `pgTable` second-arg):
+- `unique('users_username_unique').on(t.username)`
+- `unique('users_email_unique').on(t.email)`
+- `index('users_stats_wins_idx').on(sql`((${t.stats}->>'wins')::int) DESC`)` — expression index for leaderboard performance
+- `index('users_role_idx').on(t.role)` — admin filter
 
-**Pre-save hash hook (Mongoose 9 + TypeScript syntax — no `next` parameter):**
+**Drizzle schema example (concise, the AI executing this step writes the full version):**
 
 ```ts
-userSchema.pre<IUser>('save', async function () {
-  if (!this.isModified('password')) return;
-  const salt = await bcrypt.genSalt(env.BCRYPT_SALT_ROUNDS);
-  this.password = await bcrypt.hash(this.password, salt);
-});
+import { pgTable, uuid, varchar, boolean, jsonb, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import type { UserStats, UserPreferences } from '@mpg/shared/types/user';
+import type { GameType } from '@mpg/shared/types/games';
+
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  username: varchar('username', { length: 20 }).notNull().unique(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password: varchar('password', { length: 255 }).notNull(),
+  displayName: varchar('display_name', { length: 30 }).notNull(),
+  avatarUrl: varchar('avatar_url', { length: 500 }).notNull().default(''),
+  role: varchar('role', { length: 10 }).$type<'player' | 'admin'>().notNull().default('player'),
+  isGuest: boolean('is_guest').notNull().default(false),
+  bio: varchar('bio', { length: 200 }).notNull().default(''),
+  stats: jsonb('stats').$type<UserStats>().notNull().default({ wins: 0, losses: 0, draws: 0, gamesPlayed: 0 }),
+  statsByGame: jsonb('stats_by_game').$type<Record<GameType, UserStats>>().notNull().default({}),
+  preferences: jsonb('preferences').$type<UserPreferences>().notNull(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => ({
+  winsIdx: index('users_stats_wins_idx').on(sql`((${t.stats}->>'wins')::int)`),
+  roleIdx: index('users_role_idx').on(t.role),
+}));
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 ```
 
-**Instance method (declared on `IUser`):** `comparePassword(plain: string): Promise<boolean>` → `bcrypt.compare(plain, this.password)`.
+**Replacing Mongoose pre-save hooks with a service** — Drizzle has no built-in middleware, so password hashing moves into a small service:
+
+```ts
+// services/userService.ts
+import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { users, type NewUserRow, type PublicUserRow, usersPublicSelect } from '../db/schema/index.js';
+import { env } from '../config/env.js';
+
+export const createUser = async (
+  input: Pick<NewUserRow, 'username' | 'email' | 'displayName' | 'role'> & { password: string },
+): Promise<PublicUserRow> => {
+  const salt = await bcrypt.genSalt(env.BCRYPT_SALT_ROUNDS);
+  const passwordHash = await bcrypt.hash(input.password, salt);
+  const [row] = await db.insert(users).values({ ...input, password: passwordHash }).returning(usersPublicSelect);
+  return row!;
+};
+
+export const verifyPassword = (plain: string, hash: string): Promise<boolean> => bcrypt.compare(plain, hash);
+
+export const updatePasswordById = async (userId: string, newPassword: string): Promise<void> => {
+  const salt = await bcrypt.genSalt(env.BCRYPT_SALT_ROUNDS);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+  await db.update(users).set({ password: passwordHash }).where(eq(users.id, userId));
+};
+```
+
+**Public projection helper** — never returns `password`. Define it inline at the bottom of `db/schema/index.ts` so it lives next to the table definition:
+
+```ts
+// db/schema/index.ts (continued)
+export const usersPublicSelect = {
+  id: users.id,
+  username: users.username,
+  email: users.email,
+  displayName: users.displayName,
+  avatarUrl: users.avatarUrl,
+  role: users.role,
+  isGuest: users.isGuest,
+  bio: users.bio,
+  stats: users.stats,
+  statsByGame: users.statsByGame,
+  preferences: users.preferences,
+  lastLoginAt: users.lastLoginAt,
+  createdAt: users.createdAt,
+  updatedAt: users.updatedAt,
+} as const;
+// usage: db.select(usersPublicSelect).from(users)
+```
 
 **`utils/generateToken.ts`** — `generateToken(payload: JwtPayload): string` signs with `JWT_SECRET`, expiry `JWT_EXPIRES_IN` for users / `GUEST_JWT_EXPIRES_IN` for guests. `JwtPayload` is the discriminated union from `shared/types/auth.ts`.
 
@@ -565,18 +732,23 @@ export {};
 
 | Function | Method/Path | Body / Behavior |
 |---|---|---|
-| `register` | POST `/api/auth/register` | Destructure `{ username, email, password, displayName }` only — never `req.body` directly. Reject if username/email exists with generic message. Hash via pre-save hook. Return `{ user, token }` (no password). |
+| `register` | POST `/api/auth/register` | Destructure `{ username, email, password, displayName }` only — never `req.body` directly. Reject if username/email exists (catch Postgres unique-violation `23505`) with generic message. Hash via `userService.createUser`. Return `{ user, token }` (no password). |
 | `login` | POST `/api/auth/login` | `{ email, password }`. Always return identical error `Invalid email or password` for missing user OR wrong password. Update `lastLoginAt`. Return `{ user, token }`. |
 | `getMe` | GET `/api/auth/me` | Requires `protect`. Return `req.user`. |
 | `updateProfile` | PUT `/api/auth/me` | Whitelist `{ displayName, bio, avatarUrl }` only. Never accept `role`, `email`, `password`, `stats`, `isGuest`. |
-| `changePassword` | PUT `/api/auth/me/password` | `{ currentPassword, newPassword }`. Verify current, then assign new. |
-| `deleteAccount` | DELETE `/api/auth/me` | `{ password }` confirmation. Cascade-delete or anonymize user's matches. |
+| `changePassword` | PUT `/api/auth/me/password` | `{ currentPassword, newPassword }`. Verify current via `userService.verifyPassword`, then `userService.changePassword`. |
+| `deleteAccount` | DELETE `/api/auth/me` | `{ password }` confirmation. `db.delete(users).where(eq(users.id, req.user._id))` — `matches.players` jsonb references are nulled by the application (see Step 8). |
 
 **`controllers/authController.ts` — register mass-assignment guard (critical):**
 
 ```ts
-const { username, email, password, displayName } = req.body as Pick<IUser, 'username' | 'email' | 'password' | 'displayName'>;
-const user = await User.create({ username, email, password, displayName });
+import { createUser } from '../services/userService.js';
+
+type RegisterBody = Pick<NewUser, 'username' | 'email' | 'displayName'> & { password: string };
+const { username, email, password, displayName } = req.body as RegisterBody;
+const user = await createUser({ username, email, password, displayName });
+const { password: _omit, ...publicUser } = user;
+res.status(201).json({ success: true, data: { user: publicUser, token: generateToken({ id: user.id, role: user.role, isGuest: false }) } });
 ```
 
 **Routes (`routes/authRoutes.ts`):**
@@ -590,24 +762,25 @@ const user = await User.create({ username, email, password, displayName });
 | PUT | `/me/password` | `protect`, `registeredOnly`, `changePasswordValidator`, `validate` |
 | DELETE | `/me` | `protect`, `registeredOnly`, `deleteAccountValidator`, `validate` |
 
-**`middleware/errorHandler.ts`** — production-safe global handler typed as `ErrorRequestHandler`. Always log internally. Response shape: `ApiResponse<never>` with `{ success: false, message, errors? }`. In production, never include `err.stack` or Mongoose internal field paths.
+**`middleware/errorHandler.ts`** — production-safe global handler typed as `ErrorRequestHandler`. Always log internally. Response shape: `ApiResponse<never>` with `{ success: false, message, errors? }`. In production, never include `err.stack`, raw Postgres error codes, or column names. Map known Postgres error codes (`23505` unique violation, `23503` FK violation) to friendly generic messages.
 
-**`seed/seedAdmin.ts`** — connects DB, upserts admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`/`ADMIN_USERNAME` env vars (added to `.env.example`), exits.
+**`seed/seedAdmin.ts`** — imports `db`, upserts admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`/`ADMIN_USERNAME` env vars using Drizzle's `onConflictDoNothing()` on the unique `email` index, then exits.
 
 **SECURITY:**
 - Mass assignment blocked: `register` and `updateProfile` destructure exact whitelists; `role` cannot be set via any public endpoint.
 - User enumeration prevented: identical error message for both wrong email and wrong password.
-- Password hashed with bcrypt (rounds 12), `select: false`, never returned in responses, change requires current password, deletion requires password confirmation.
+- Password hashed with bcrypt (rounds 12) — the `password` column is excluded from public projections (`usersPublicSelect`), never returned in responses; change requires current password, deletion requires password confirmation.
 - JWT signed with secret length-validated at startup; tokens accepted only from `Authorization` header.
 - `protect` rejects expired/invalid tokens with generic `Not authenticated`.
 - `registeredOnly` ensures account-management routes are never reachable by guests.
 - Admin seed credentials only read from env (never hard-coded).
+- Postgres error codes never leaked to client — `23505` becomes `'Username or email already in use.'` (or generic for login).
 
 ---
 
 ## STEP 4 — Guest Authentication Flow
 
-Guests can join games without registering. They get a short-lived JWT bound to a random in-memory identity stored only inside the token; no MongoDB user document is created.
+Guests can join games without registering. They get a short-lived JWT bound to a random in-memory identity stored only inside the token; no `users` row is inserted in Postgres.
 
 **`controllers/authController.ts`** add:
 
@@ -616,8 +789,8 @@ Guests can join games without registering. They get a short-lived JWT bound to a
 | `loginAsGuest` | POST `/api/auth/guest` | `{ displayName }`. Validate displayName (3–20 chars, trim, escape). Generate UUID v4 as guest id. Sign JWT payload `{ id: guestId, role: 'player', isGuest: true, displayName }` with `GUEST_JWT_EXPIRES_IN`. Return `{ user: { _id: guestId, displayName, isGuest: true, role: 'player' }, token }`. |
 
 **`middleware/authMiddleware.ts` — `protect` upgrade** (TypeScript discriminated-union narrowing handles guest/registered safely):
-- If decoded payload has `isGuest === true`, do **not** query MongoDB. Build `req.user` from token claims directly.
-- If `isGuest === false`, fetch from MongoDB; reject if not found.
+- If decoded payload has `isGuest === true`, do **not** query Postgres. Build `req.user` from token claims directly.
+- If `isGuest === false`, fetch from `users` via `db.select().from(users).where(eq(users.id, decoded.id)).limit(1)`; reject if missing.
 
 **Routes:**
 
@@ -757,28 +930,32 @@ A focused endpoint for per-user preferences with strict per-key validation, used
 |---|---|---|
 | `updateMyPreferences` | PATCH `/api/users/me/preferences` | Body is a partial `UserPreferences` object. Whitelist each top-level key and each nested key. Reject unknown keys with 400. Apply via `$set` with dot-notation paths so partial updates don't overwrite unrelated nested fields. |
 
-**Implementation pattern (`updateMyPreferences`):**
+**Implementation pattern (`updateMyPreferences`)** — load → deep-merge against current jsonb → write back atomically. Postgres `jsonb_set` could be used for surgical updates, but a read-modify-write within a single transaction is simpler and safe here because each user only has their own preferences:
 
 ```ts
-const ALLOWED_KEYS: Array<keyof UserPreferences> = [
-  'theme', 'fontSize', 'animations', 'sounds', 'soundVolume', 'language',
-];
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { users } from '../db/schema/users.js';
 
-const updates: Record<string, unknown> = {};
-for (const [key, value] of Object.entries(req.body)) {
-  if (key === 'notifications' || key === 'privacy') {
-    // Nested object: validate each leaf
-    if (typeof value !== 'object' || value === null) continue;
-    for (const [nestedKey, nestedValue] of Object.entries(value)) {
-      updates[`preferences.${key}.${nestedKey}`] = nestedValue;
+const ALLOWED_TOP: Array<keyof UserPreferences> = ['theme', 'fontSize', 'animations', 'sounds', 'soundVolume', 'language'];
+
+const result = await db.transaction(async (tx) => {
+  const [row] = await tx.select({ preferences: users.preferences }).from(users).where(eq(users.id, req.user!._id)).limit(1);
+  if (!row) throw new HttpError(404, 'User not found');
+
+  const next: UserPreferences = { ...row.preferences };
+  for (const [key, value] of Object.entries(req.body)) {
+    if (key === 'notifications' || key === 'privacy') {
+      if (value && typeof value === 'object') next[key] = { ...next[key], ...(value as object) };
+    } else if (ALLOWED_TOP.includes(key as keyof UserPreferences)) {
+      (next as Record<string, unknown>)[key] = value;
     }
-  } else if (ALLOWED_KEYS.includes(key as keyof UserPreferences)) {
-    updates[`preferences.${key}`] = value;
   }
-  // Unknown keys silently ignored (already filtered by validator before reaching here)
-}
-const user = await User.findByIdAndUpdate(req.user!._id, { $set: updates }, { new: true, runValidators: true });
-res.json({ success: true, data: user!.preferences });
+  const [updated] = await tx.update(users).set({ preferences: next }).where(eq(users.id, req.user!._id)).returning({ preferences: users.preferences });
+  return updated!.preferences;
+});
+
+res.json({ success: true, data: result });
 ```
 
 **Key validation** is fully enforced by `preferencesValidator` (Step 25 details the per-key rules). The controller's whitelist is a second defense layer.
@@ -805,8 +982,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 ```
 
 **SECURITY:**
-- Two layers of whitelisting: the express-validator chain rejects unknown/invalid keys, then the controller only writes known keys to MongoDB.
-- `runValidators: true` on `findByIdAndUpdate` so Mongoose schema enums (e.g., theme `light/dark/system`) re-validate.
+- Two layers of whitelisting: the express-validator chain rejects unknown/invalid keys, then the controller only writes known keys to Postgres.
+- The controller deep-merges incoming patch against `DEFAULT_PREFERENCES` (any unknown key is dropped) and re-validates enums (e.g., theme `light/dark/system`) before writing the entire preferences jsonb back with `db.update(users).set({ preferences: merged }).where(...)`.
 - Privacy preference changes (`showStats`, `showOnLeaderboard`) take effect immediately on the next public profile / leaderboard query — no caching layer to invalidate.
 - Notifications preferences are **only** consumed client-side for now (toast suppression); server doesn't push notification emails.
 
@@ -814,50 +991,95 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 
 ## STEP 8 — Match History Model & Stats Tracking
 
-Persist completed games to MongoDB and increment per-user stats atomically.
+Persist completed games to Postgres and increment per-user stats atomically using SQL `UPDATE` with arithmetic on jsonb.
 
-**`models/Match.ts`** — declare `IMatch` interface (also exported via `shared/types/match.ts` minus Mongoose internals). Fields:
+**`db/schema/index.ts` (continued)** — append the `matches` `pgTable` next to `users` in the same file. The row type is exported as `MatchRow` and re-used alongside `MatchRecord` in `shared/types/match.ts` (with the jsonb shapes spelled out for client consumption).
 
-| Field | Type | Required | Notes |
+**Columns:**
+
+| Column | SQL Type | Constraints / Default | Notes |
 |---|---|---|---|
-| `gameType` | String | yes | enum: `tictactoe`, `cardgame` |
-| `roomCode` | String | yes | UUID-derived short code |
-| `players` | Array<Subdoc> | yes | each `{ userId: ObjectId | null, displayName, isGuest, position }` |
-| `winnerUserId` | ObjectId | no | null on draw or all-guest game without winning registered user |
-| `winnerDisplayName` | String | no | snapshot for leaderboard / history rendering |
-| `result` | String | yes | enum: `win`, `draw`, `aborted` |
-| `durationMs` | Number | yes | computed in service |
-| `moves` | Array | no | game-specific move log (TicTacToe: indexes; CardGame: action log) |
-| `createdAt` | Date | timestamp | indexed `-1` |
+| `id` | `uuid` | PK, `defaultRandom()` | |
+| `gameType` | `varchar(20)` | `$type<GameType>()`, not null | `'tictactoe'` / `'cardgame'` |
+| `roomCode` | `varchar(36)` | not null | UUID v4 issued at room creation |
+| `players` | `jsonb` | `$type<MatchPlayer[]>()`, not null | each `{ userId: string \| null, displayName, isGuest, position }` |
+| `winnerUserId` | `uuid` | nullable, `references(() => users.id, { onDelete: 'set null' })` | null on draw or all-guest game |
+| `winnerDisplayName` | `varchar(30)` | nullable | snapshot for guests / deleted users |
+| `result` | `varchar(15)` | `$type<'win' \| 'draw' \| 'aborted'>()`, not null | |
+| `durationMs` | `integer` | not null, default `0` | |
+| `moves` | `jsonb` | `$type<MatchMove[]>()`, not null, default `[]` | game-specific move log |
+| `createdAt` | `timestamptz` | `defaultNow()`, not null | |
 
-**Indexes:** `{ 'players.userId': 1, createdAt: -1 }`, `{ winnerUserId: 1, createdAt: -1 }`.
+**Indexes:**
+- `index('matches_winner_idx').on(t.winnerUserId, t.createdAt)`
+- `index('matches_game_created_idx').on(t.gameType, t.createdAt)`
+- GIN index on `players`: `index('matches_players_gin_idx').using('gin', t.players)` — required for fast "my recent matches" jsonb-containment lookups.
+
+**Player-history query pattern:**
+
+```ts
+// Last 20 matches that include this user (uses GIN index above)
+const myMatches = await db.select()
+  .from(matches)
+  .where(sql`${matches.players} @> ${JSON.stringify([{ userId }])}::jsonb`)
+  .orderBy(desc(matches.createdAt))
+  .limit(20);
+```
 
 **`services/matchService.ts`:**
 
 | Function | Behavior |
 |---|---|
-| `recordMatch({ gameType, roomCode, players, winnerUserId, winnerDisplayName, result, durationMs, moves })` | Insert `Match`. For each registered (non-guest) player, atomically update their stats: `{ $inc: { 'stats.gamesPlayed': 1, 'stats.<wins|losses|draws>': 1, 'statsByGame.<game>.gamesPlayed': 1, 'statsByGame.<game>.<wins|losses|draws>': 1 } }`. Use a single `bulkWrite` for the user updates. |
+| `recordMatch({ gameType, roomCode, players, winnerUserId, winnerDisplayName, result, durationMs, moves })` | Inside a single `db.transaction(...)`: (1) `INSERT INTO matches`, (2) for each registered (non-guest) player, run an atomic `UPDATE users SET stats = ..., stats_by_game = ...` using `jsonb_set` arithmetic so concurrent finishes never lose updates. |
 | `abortMatch({ roomCode, gameType, players, reason })` | Insert match with `result: 'aborted'`. No stat increments. |
+
+**Atomic stats increment (the tricky bit — replaces Mongoose `$inc` + `bulkWrite`):**
+
+```ts
+import { sql, eq } from 'drizzle-orm';
+import { users } from '../db/schema/users.js';
+
+// outcome ∈ 'wins' | 'losses' | 'draws'
+const incrementStats = (tx: typeof db, userId: string, gameType: GameType, outcome: 'wins' | 'losses' | 'draws') =>
+  tx.update(users).set({
+    stats: sql`jsonb_set(
+      jsonb_set(${users.stats}, '{gamesPlayed}', ((COALESCE(${users.stats}->>'gamesPlayed','0'))::int + 1)::text::jsonb),
+      ${'{' + outcome + '}'}, ((COALESCE(${users.stats}->>${outcome},'0'))::int + 1)::text::jsonb
+    )`,
+    statsByGame: sql`jsonb_set(
+      jsonb_set(
+        COALESCE(${users.statsByGame}, '{}'::jsonb),
+        ${'{' + gameType + '}'},
+        COALESCE(${users.statsByGame}->${gameType}, '{"wins":0,"losses":0,"draws":0,"gamesPlayed":0}'::jsonb)
+      ),
+      ${'{' + gameType + ',' + outcome + '}'},
+      ((COALESCE(${users.statsByGame}->${gameType}->>${outcome},'0'))::int + 1)::text::jsonb
+    )`,
+  }).where(eq(users.id, userId));
+```
+
+Encapsulate this verbose SQL in a `incrementStats(tx, userId, gameType, outcome)` helper inside `services/matchService.ts`. Postgres performs each `UPDATE` under row-level lock, so simultaneous wins for the same user do not lose increments.
 
 **`controllers/matchController.ts`:**
 
 | Function | Method/Path | Behavior |
 |---|---|---|
 | `getMatchById` | GET `/api/matches/:id` | `optionalAuth`. Public read. Returns full match with player display names. |
-| `getRecentMatches` | GET `/api/matches` | Public. Pagination, optional `gameType` filter, sort by `createdAt: -1`. |
+| `getRecentMatches` | GET `/api/matches` | Public. Pagination, optional `gameType` filter, `ORDER BY created_at DESC`. |
 
 **Routes (`routes/matchRoutes.ts`):**
 
 | Method | Path | Middleware |
 |---|---|---|
 | GET | `/` | `optionalAuth`, `paginationValidator`, `gameTypeFilterValidator`, `validate` |
-| GET | `/:id` | `optionalAuth`, `mongoIdParamValidator`, `validate` |
+| GET | `/:id` | `optionalAuth`, `uuidParamValidator`, `validate` |
 
 **SECURITY:**
 - Match write is server-only (called from socket handlers, never via REST).
 - `players[].userId` is `null` for guests — no fake user-id injection possible.
 - `getMatchById`/`getRecentMatches` are read-only public endpoints; no internal fields leaked.
-- Stat increments use atomic `$inc` to prevent race conditions when two games finish simultaneously for the same user.
+- Stat increments use Postgres row-level locking via `UPDATE` — concurrent game-end events for the same user never lose increments.
+- All match writes happen inside a transaction, so a partial failure (e.g., one stat update errors) rolls back the match insert too — match history and stats stay consistent.
 
 ---
 
@@ -869,7 +1091,7 @@ Compute the leaderboard from `User.stats` with a configurable game filter.
 
 | Function | Method/Path | Behavior |
 |---|---|---|
-| `getLeaderboard` | GET `/api/leaderboard` | Query params: `gameType` (optional, enum), `page` (default 1), `limit` (default 25, max 100). Filter `{ isGuest: false, 'preferences.privacy.showOnLeaderboard': true }`. If `gameType` provided, sort by `statsByGame.<game>.wins: -1`; else by `stats.wins: -1`. Project public fields only: `{ username, displayName, avatarUrl, stats, statsByGame.<game> }`. |
+| `getLeaderboard` | GET `/api/leaderboard` | Query params: `gameType` (optional, enum), `page` (default 1), `limit` (default 25, max 100). Filter `WHERE is_guest = false AND (preferences->'privacy'->>'showOnLeaderboard')::boolean = true`. If `gameType` provided, `ORDER BY (stats_by_game->'<game>'->>'wins')::int DESC NULLS LAST`; else `ORDER BY (stats->>'wins')::int DESC`. Project public columns only: `id, username, displayName, avatarUrl, stats` (and the relevant `statsByGame[gameType]` slice). The `users_stats_wins_idx` expression index makes this query fast. |
 
 **Routes (`routes/leaderboardRoutes.ts`):**
 
@@ -983,7 +1205,7 @@ registerSocketHandlers(io);
 - Read token from `socket.handshake.auth.token` (preferred) or `socket.handshake.headers.authorization`.
 - `jwt.verify(token, env.JWT_SECRET) as JwtPayload`.
 - For guest tokens (discriminant `isGuest === true`), build `socket.data.user` from claims directly.
-- For registered tokens, fetch user from MongoDB by `_id`; if missing, reject.
+- For registered tokens, fetch user from Postgres by `id` via `db.select({ id: users.id, role: users.role, displayName: users.displayName, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, decoded.id)).limit(1)`; if no row, reject.
 - Set `socket.data.user = { _id, displayName, role, isGuest, avatarUrl }` and `socket.join(\`user:${_id}\`)`.
 - On error: `next(new Error('UNAUTHORIZED'))`.
 
@@ -1619,7 +1841,7 @@ const emitStateToRoom = <T extends GameState>(
 - `getStateFor(userId)` ensures private game data (card hands) is never broadcast room-wide.
 - Match recording is server-side only and atomic with stat increments.
 - Rematch votes are reset on `game:end` to prevent stale-vote pollution.
-- Aborted games still record a row in MongoDB (for admin auditing) but do **not** increment stats.
+- Aborted games still record a row in Postgres (for admin auditing) but do **not** increment stats.
 
 ---
 
@@ -1655,7 +1877,7 @@ Wire `express-validator` rules to every REST endpoint. Each validator file expor
 |---|---|
 | `authValidators.ts` | `registerValidator` (username regex `^[a-z0-9_]+$` 3–20, email `isEmail` + `normalizeEmail`, password min 8 + complexity, displayName 2–30 trim+escape), `loginValidator`, `guestLoginValidator` (displayName 3–20 + escape), `changePasswordValidator`, `deleteAccountValidator` |
 | `userValidators.ts` | `updateProfileValidator` (displayName, bio escape ≤200, avatarUrl URL), `preferencesValidator` (each key checked against enum/boolean — see below), `usernameParamValidator`, `paginationValidator` |
-| `matchValidators.ts` | `mongoIdParamValidator` (`isMongoId()`), `gameTypeFilterValidator` (`isIn(['tictactoe','cardgame'])`) |
+| `matchValidators.ts` | `uuidParamValidator` (`isUUID(4)`), `gameTypeFilterValidator` (`isIn(['tictactoe','cardgame'])`) |
 | `adminValidators.ts` | `updateRoleValidator` (role enum), `userIdParamValidator`, `userSearchValidator` (escape + regex-escape via `customSanitizer`) |
 
 **`preferencesValidator` per-key rules:**
@@ -1695,7 +1917,7 @@ export const validate = (req: Request, res: Response, next: NextFunction): void 
 **SECURITY:**
 - Every text field that ends up rendered in another user's view (displayName, bio, chat, search) is `escape()`d to prevent stored XSS.
 - Email is `normalizeEmail()`d so `User+1@gmail.com` and `user@gmail.com` cannot register as separate accounts.
-- All MongoID params validated via `isMongoId()` — invalid ids fail at validator layer, never reach Mongoose.
+- All ID params validated via `isUUID(4)` — invalid ids fail at validator layer, never reach the database driver.
 - Pagination clamped: `limit` `isInt({ min: 1, max: 50 })` (or 100 for leaderboard), `page` `isInt({ min: 1 })`.
 
 ---
@@ -1768,8 +1990,9 @@ export const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => E
 - [ ] Helmet: enabled with default safe headers.
 - [ ] CORS: strict specific origin from `CLIENT_ORIGIN`; never `*` in production. Same origin enforced for Socket.io.
 - [ ] Body size limits: `express.json({ limit: '10kb' })` and `express.urlencoded({ limit: '10kb' })`. Socket.io `maxHttpBufferSize: 1e5`.
-- [ ] mongo-sanitize: applied via custom middleware on `req.body` and `req.params` only (Express 5 compliant). `app.use(mongoSanitize())` is **not** used.
-- [ ] Express 5 compatibility: no code assigns to `req.query`. `hpp` is **not** installed.
+- [ ] SQL injection: Drizzle + `postgres-js` parameterized queries used everywhere. **Zero** raw string interpolation of user input into `sql`` template literals — only `${variable}` (parameterized) is allowed.
+- [ ] Prototype-pollution: `sanitizeMiddleware` strips `__proto__`/`constructor`/`prototype` keys and clamps object depth.
+- [ ] Express 5 compatibility: no code assigns to `req.query`. `hpp` and `express-mongo-sanitize` are **not** installed.
 - [ ] XSS: `escape()` applied via express-validator on all user text (displayName, bio, chat, search queries).
 - [ ] ReDoS: `escapeRegex` used on every regex-based user search (admin search, public profile lookup).
 - [ ] Ownership checks: `room:leave`, `game:action`, `game:rematch_request` verify `socket.user._id` is a current player.
@@ -1784,7 +2007,10 @@ export const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => E
 - [ ] `.env.example` synced with all required keys; no real secrets.
 - [ ] No `console.log` of tokens, hashes, or PII in production code.
 - [ ] Token storage: client uses `localStorage` only; never written to non-secure cookies.
-- [ ] Mongoose 9: every `pre`/`post` hook uses `async function()` without `next` parameter — no `next()` calls anywhere.
+- [ ] Drizzle: schema is the single source of truth (no parallel `interface` drift). `password` column never selected by default — public reads use `usersPublicSelect` projection.
+- [ ] Migrations: every schema change has a generated `drizzle/NNNN_*.sql` file committed. Never hand-edit production-applied migrations.
+- [ ] Postgres error codes (`23505` unique violation, `23503` FK violation, `23502` not-null) are mapped to friendly generic messages in `errorHandler` — raw codes/columns never leak.
+- [ ] Connection pool capped (`max: 10` prod, `max: 5` dev) to stay under Neon free-tier limits.
 - [ ] TypeScript strict: `tsconfig.base.json` has `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`. No `any` anywhere except in third-party type shims.
 - [ ] Shared types: every wire-crossing payload (Socket.io events, REST responses, JWT claims) sourced from `shared/types/*.ts` — no duplicate type definitions on client and server.
 - [ ] Socket.io typed: `Server<ClientToServerEvents, ServerToClientEvents, ..., SocketData>` used on both server and client; payload typos caught at compile time.
@@ -1927,21 +2153,23 @@ __fixtures__/
 **SECURITY:**
 - Tests use deterministic seeds for shuffles (override `crypto.randomBytes` with a fixed buffer in test setup) so card-game test outcomes are reproducible.
 - Tests **never** import production secrets; JWT fixtures are signed with a test-only secret declared in `vitest.setup.ts`.
-- No real Redis or Mongo connection in unit tests — only in-memory mocks.
+- No real Redis or Postgres connection in unit tests — only in-memory mocks. Drizzle queries are not exercised in unit tests; `services/userService` and `services/matchService` are tested via integration tests (Step 30) where they hit a real ephemeral Postgres instance.
 
 ---
 
 ## STEP 30 — Integration Tests (REST + Socket.io flows)
 
-End-to-end tests that exercise the real Express app and a real Socket.io server, against ephemeral test instances of MongoDB and Redis.
+End-to-end tests that exercise the real Express app and a real Socket.io server, against ephemeral test instances of Postgres and Redis.
 
-**Tooling:** `vitest`, `supertest` (REST), `socket.io-client` (sockets), `mongodb-memory-server` OR a Docker-Compose-managed test container, `ioredis-mock`.
+**Tooling:** `vitest`, `supertest` (REST), `socket.io-client` (sockets), `@testcontainers/postgresql` (or a CI-provided service container — see Step 53), `ioredis-mock`.
 
 **Test infrastructure (`src/__tests__/setup.integration.ts`):**
 
-- `beforeAll`: spin up MongoMemoryServer, set `MONGO_URI`, set `REDIS_URL` to `ioredis-mock://`, start the app on a random port via `app.listen(0)`, attach Socket.io.
-- `afterEach`: clear all DB collections + Redis keys.
-- `afterAll`: close server, close DB, stop MongoMemoryServer.
+- `beforeAll`: start a Testcontainers Postgres instance (`new PostgreSqlContainer('postgres:16-alpine').start()`), set `DATABASE_URL` to its connection URL, run `migrate(...)` once to apply all migration files, set `REDIS_URL` to `ioredis-mock://`, start the app on a random port via `app.listen(0)`, attach Socket.io.
+- `afterEach`: `TRUNCATE matches, users RESTART IDENTITY CASCADE` for fast reset (faster than `DROP TABLE` + re-migrate); `redis.flushall()`.
+- `afterAll`: close server, `await dbClient.end()`, stop Postgres container.
+
+> **CI fast path:** GitHub Actions provides a `services: postgres` container (Step 53). In CI, skip Testcontainers and connect directly to that service — saves ~10 s per test run.
 
 **Test files:**
 
@@ -1950,14 +2178,14 @@ End-to-end tests that exercise the real Express app and a real Socket.io server,
 | `__tests__/auth.integration.test.ts` | Register → login → getMe → updateProfile → changePassword → deleteAccount end-to-end. Negative: duplicate username, wrong password, role escalation attempt |
 | `__tests__/guest.integration.test.ts` | `loginAsGuest` returns valid token; guest cannot access `/api/users/me`; guest can connect socket and join a room |
 | `__tests__/room.integration.test.ts` | Two clients connect with different JWTs → client A creates room → client B joins → both receive `room:state` → second join into a full room rejected |
-| `__tests__/tictactoe.integration.test.ts` | Full game: 2 players connect, room created, game starts, alternating valid moves, server emits state after each, opponent receives `game:turn`, win is detected, `game:end` fires, MongoDB has new Match doc, both players' stats incremented |
+| `__tests__/tictactoe.integration.test.ts` | Full game: 2 players connect, room created, game starts, alternating valid moves, server emits state after each, opponent receives `game:turn`, win is detected, `game:end` fires, Postgres `matches` table has new row, both players' jsonb `stats.wins`/`stats.gamesPlayed` incremented |
 | `__tests__/cardgame.integration.test.ts` | 4 players connect, room fills, game starts, hand-counts correct, must-follow-suit enforced (off-suit move rejected), trick resolution rotates lead, final scoring matches manually computed expected |
 | `__tests__/spectator.integration.test.ts` | Spectator joins, receives `game:state` without `myHand`, `game:action` from spectator returns `error_event` |
 | `__tests__/matchmaking.integration.test.ts` | 2 clients queue for tictactoe → both receive `matchmaking:matched` with same roomCode → join the room → game starts |
 | `__tests__/chat.integration.test.ts` | Message broadcast, 300-char limit, throttle (second message within 500ms rejected), 50-msg history cap |
 | `__tests__/disconnect.integration.test.ts` | Client A disconnects mid-game → other player sees `room:state` with `isConnected: false` → A reconnects within grace → state resumes. A doesn't reconnect → after grace, opponent receives `game:end` with forfeit |
 | `__tests__/admin.integration.test.ts` | Admin token required for `/api/admin/*`. Self-protection: admin cannot delete self. Last-admin: cannot demote the only admin |
-| `__tests__/security.integration.test.ts` | NoSQL injection attempt blocked, XSS payload escaped, oversized body rejected (10kb limit), no `x-powered-by` header, helmet headers present, role escalation via `PUT /api/auth/me` body fails silently |
+| `__tests__/security.integration.test.ts` | SQL-injection-style payload (`'; DROP TABLE users;--`) treated as plain string by Drizzle parameterized queries (no error, no leak); XSS payload escaped; oversized body rejected (10 KB limit); prototype-pollution attempt (`{ "__proto__": { "polluted": true } }`) stripped by sanitizeMiddleware; no `x-powered-by` header; helmet headers present; role escalation via `PUT /api/auth/me` body fails silently |
 
 **Helper: `createTestClient` factory:**
 
@@ -2750,7 +2978,7 @@ Use `<Suspense fallback={<Spinner />}>` per lazy boundary.
 
 **Server-side perf:**
 - `compression` middleware (gzip) added in `server.ts`.
-- Mongoose `.lean()` on read-only queries (leaderboard, public profiles, match list).
+- Drizzle returns plain rows (no document hydration overhead). For read-only public endpoints (leaderboard, public profiles, match list), use the explicit projection helpers (`usersPublicSelect`) so the wire payload omits `password` and any future internal columns.
 
 **SECURITY:** Lazy chunks must still go through the same auth guards; route guards run before the lazy boundary mounts, so unauthenticated users never download admin code.
 
@@ -2861,7 +3089,7 @@ vi.mock('../socket/socket', () => ({ getSocket: () => mockSocket, /* ... */ }));
 
 Top-level `README.md` with the following sections:
 
-- **Title + tagline + tech badges** (TypeScript, Node, React, Socket.io, Redis, MongoDB, TailwindCSS).
+- **Title + tagline + tech badges** (TypeScript, Node, React, Socket.io, Redis, Neon Postgres, Drizzle ORM, TailwindCSS).
 - **Demo link** (filled in after deploy).
 - **Features** (real-time multiplayer, room codes, matchmaking queue, spectators, chat, rematches, leaderboard, two games, admin panel, guest mode).
 - **Architecture diagram** as a fenced ASCII block:
@@ -2879,14 +3107,14 @@ Top-level `README.md` with the following sections:
                   │  (Render)   │  Node 20 LTS, compiled to dist/
                   └──┬───────┬──┘
                      │       │
-            JWT auth │       │ Mongoose
+            JWT auth │       │ Drizzle ORM
                      ▼       ▼
               ┌─────────┐ ┌──────────────┐
-              │  Redis  │ │   MongoDB    │
-              │ (Cloud) │ │   (Atlas)    │
+              │  Redis  │ │   Postgres   │
+              │ (Cloud) │ │    (Neon)    │
               │ Rooms,  │ │  Users,      │
               │ Queues, │ │  Matches,    │
-              │ TTL     │ │  Stats       │
+              │ TTL     │ │  Stats jsonb │
               └─────────┘ └──────────────┘
 ```
 
@@ -2937,7 +3165,7 @@ services:
     ports: ['6379:6379']
 ```
 
-Integration test env vars set to `mongodb://localhost:27017/test_mpg` and `redis://localhost:6379`.
+Integration test env vars set to `postgresql://postgres:postgres@localhost:5432/test_mpg` and `redis://localhost:6379`. The CI job declares a `services.postgres: postgres:16-alpine` container with health-check, then runs `npm run db:migrate` before `npm test` to apply the latest schema. Redis service is `services.redis: redis:7-alpine`.
 
 **`.github/workflows/deploy-preview.yml`** — on PR open/update:
 - Build client → deploy to a Netlify deploy preview (uses Netlify GitHub App; no extra workflow needed if app is installed).
@@ -2950,7 +3178,7 @@ Integration test env vars set to `mongodb://localhost:27017/test_mpg` and `redis
 - Disable force pushes.
 
 **Secret management:**
-- All real secrets (`MONGO_URI`, `JWT_SECRET`, etc.) live only in Render/Netlify env vars — never in GitHub Actions secrets unless needed by deploy workflows. CI uses local containers and dummy secrets.
+- All real secrets (`DATABASE_URL`, `JWT_SECRET`, etc.) live only in Render/Netlify env vars — never in GitHub Actions secrets unless needed by deploy workflows. CI uses local service containers and dummy secrets.
 
 **Status badge in README:**
 
@@ -2976,7 +3204,8 @@ Integration test env vars set to `mongodb://localhost:27017/test_mpg` and `redis
 - Sync `.env.example` (server + client) with the latest set of required keys; verify no real secrets present.
 - Run `npm audit --omit=dev` on server and client; address high-severity findings.
 - Re-run the Step 27 audit checklist top-to-bottom and mark each item.
-- Verify Mongoose 9 hook syntax across `User.ts` and `Match.ts` (no `next` parameter).
+- Verify the Drizzle schema file (`db/schema/index.ts`) matches the latest generated migration in `drizzle/`. Run `npx drizzle-kit check` — it must report zero pending changes.
+- Verify no raw user input is interpolated inside `sql\`\`` template literals — `rg "sql\\\`.*\\$\\{" server/src` should only match `${columnName}` (column refs) or `${parameterizedVar}` (auto-bound), never string concatenation.
 - Verify no `req.query` mutations anywhere (Express 5).
 - Verify `hpp` is **not** in `package.json`.
 - Verify `shared/types/*.ts` is the single source for every wire-crossing payload — no duplicate type declarations on client and server.
@@ -2985,13 +3214,22 @@ Integration test env vars set to `mongodb://localhost:27017/test_mpg` and `redis
 
 ---
 
-## STEP 55 — Deployment (Render + Netlify + Redis Cloud + MongoDB Atlas + optional Sentry)
+## STEP 55 — Deployment (Render + Netlify + Redis Cloud + Neon Postgres + optional Sentry)
 
-**MongoDB Atlas:**
-- Create free-tier M0 cluster.
-- Database user with strong password (16+ chars, generated).
-- Network access: temporary `0.0.0.0/0` for setup, then narrow to Render egress IPs once available.
-- Connection string → `MONGO_URI`.
+**Neon Postgres:**
+- Create project on [neon.tech](https://neon.tech) free tier (0.5 GB storage, 100 compute hours/month, autosuspend after 5 min idle).
+- Default branch is `main` — keep it for production. Optionally create a `dev` branch for staging (Neon branches share storage and are free).
+- Copy the **pooled** connection string (transaction-mode pooler, ends with `-pooler.region.aws.neon.tech`) — required because Drizzle's `postgres-js` is configured with `prepare: false`. The non-pooled connection works for `db:migrate` only.
+- Enable IP allowlist in Neon settings → for Render, add `0.0.0.0/0` (Render egress IPs are dynamic on free tier) and rely on `sslmode=require` + strong DB password for security.
+- Connection string → `DATABASE_URL` env var on Render.
+
+**Migration on deploy** — add a Render *predeploy command* (Render dashboard → Settings → Build & Deploy):
+
+```
+predeploy: npm --prefix server run db:migrate
+```
+
+This applies pending migrations once before the new server instance starts handling traffic. If a migration fails, the deploy aborts and the previous version keeps serving — safe by default.
 
 **Redis Cloud:**
 - Create free-tier 30 MB DB.
@@ -3004,7 +3242,7 @@ Integration test env vars set to `mongodb://localhost:27017/test_mpg` and `redis
 - Start command: `node dist/src/server.js`.
 - **Critical:** Render must have access to the `shared/` folder during build. Since `server/tsconfig.json` references `../shared`, configure Render's root directory as the **repo root** (not `server/`) and override the build/start paths: build = `cd server && npm install && npm run build`, start = `cd server && node dist/src/server.js`. Alternative: keep `server/` as root and copy `shared/` into `server/shared/` via a `prebuild` script.
 - Plan that supports **WebSockets** (Render's free Web Service does support WebSockets — confirm).
-- Env vars: every key from `.env.example` plus `JWT_SECRET` (generated, ≥ 32 chars), `NODE_ENV=production`, `CLIENT_ORIGIN=https://<your-netlify-domain>`, `MONGO_URI`, `REDIS_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME`.
+- Env vars: every key from `.env.example` plus `JWT_SECRET` (generated, ≥ 32 chars), `NODE_ENV=production`, `CLIENT_ORIGIN=https://<your-netlify-domain>`, `DATABASE_URL` (Neon pooled connection), `REDIS_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME`.
 - Health check path: `/api/health`.
 - Run admin seed once via Render Shell: `cd server && npx tsx src/seed/seedAdmin.ts` (or after build: `node dist/src/seed/seedAdmin.js`).
 

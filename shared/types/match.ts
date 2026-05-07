@@ -1,4 +1,25 @@
-import type { GameType } from "./games.js";
+import type { GameType } from './games.js';
+
+export interface MatchPlayerSnapshot {
+  userId: string | null;
+  displayName: string;
+  avatar?: string;
+  isGuest: boolean;
+  score: number;
+  position?: number;
+}
+
+export type MatchResult =
+  | { outcome: 'win'; winnerId: string }
+  | { outcome: 'draw' }
+  | { outcome: 'forfeit'; forfeitedBy: string };
+
+export interface MatchMove {
+  by: string;
+  type: string;
+  payload: unknown;
+  at: number;
+}
 
 export interface MatchRecord {
   id: string;
@@ -10,17 +31,5 @@ export interface MatchRecord {
   totalRounds: number;
   startedAt: string;
   endedAt: string;
+  createdAt: string;
 }
-
-export interface MatchPlayerSnapshot {
-  userId: string;
-  displayName: string;
-  avatar?: string;
-  isGuest: boolean;
-  score: number;
-}
-
-export type MatchResult =
-  | { outcome: "win"; winnerId: string }
-  | { outcome: "draw" }
-  | { outcome: "forfeit"; forfeitedBy: string };

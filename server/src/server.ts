@@ -4,10 +4,10 @@ import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import mongoose from 'mongoose';
+import { sql } from 'drizzle-orm';
 
 import { env } from './config/env.js';
-import { connectDB } from './config/db.js';
+import { db, dbClient } from './db/index.js';
 import { redis } from './config/redis.js';
 import { sanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
 import { globalLimiter } from './middleware/rateLimiters.js';
@@ -17,67 +17,83 @@ import userRouter from './routes/userRoutes.js';
 
 const app = express();
 
-// 3. Disable x-powered-by
 app.disable('x-powered-by');
 
-// 4. Helmet security headers
 app.use(helmet());
 
-// 5. CORS
-app.use(cors({
-  origin: env.CLIENT_ORIGIN,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-}));
+app.use(
+  cors({
+    origin: env.CLIENT_ORIGIN,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  }),
+);
 
-// 6. JSON body parser
 app.use(express.json({ limit: '10kb' }));
-
-// 7. URL-encoded body parser
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-
-// 8. Mongo sanitize (Express 5–safe)
 app.use(sanitizeMiddleware);
 
-// 9. Static file serving (avatar uploads)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
-  maxAge: '7d',
-  dotfiles: 'deny',
-  index: false,
-}));
+app.use(
+  '/uploads',
+  express.static(path.join(process.cwd(), 'uploads'), {
+    maxAge: '7d',
+    dotfiles: 'deny',
+    index: false,
+  }),
+);
 
-// 10. Global rate limiter
 app.use('/api', globalLimiter);
 
-// 10. Health check
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
+  let dbReady = false;
+  try {
+    await db.execute(sql`SELECT 1`);
+    dbReady = true;
+  } catch {
+    dbReady = false;
+  }
+
   res.json({
     status: 'ok',
     uptime: process.uptime(),
-    db: mongoose.connection.readyState === 1,
+    db: dbReady,
     redis: redis.status === 'ready',
   });
 });
 
-// 11. Routes
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
-// app.use('/api/matches', matchesRouter);    // Step 5+
-// app.use('/api/leaderboard', leaderboardRouter); // Step 5+
-// app.use('/api/admin', adminRouter);        // Step 5+
 
-// 12. Error handler (must be last)
 app.use(errorHandler);
 
-// 13. Create HTTP server, connect DB, listen
 const httpServer = http.createServer(app);
 
 const bootstrap = async (): Promise<void> => {
-  await connectDB();
+  // Verify DB reachability at startup; fail fast if Postgres is unreachable.
+  await db.execute(sql`SELECT 1`);
+  console.log('Postgres connection verified');
+
   httpServer.listen(env.PORT, () => {
     console.log(`Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);
   });
 };
+
+const shutdown = async (signal: string): Promise<void> => {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+  httpServer.close(() => {
+    console.log('HTTP server closed');
+  });
+  try {
+    await dbClient.end({ timeout: 5 });
+    redis.disconnect();
+  } catch (err) {
+    console.error('Error during shutdown:', err);
+  }
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
 
 bootstrap().catch((err) => {
   console.error('Failed to start server:', err);

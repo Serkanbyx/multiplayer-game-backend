@@ -1,10 +1,22 @@
 import type { Request, Response, NextFunction } from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import User from '../models/User.js';
-import Match from '../models/Match.js';
+import { sql, desc } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { matches } from '../db/schema/index.js';
+import {
+  findPublicById,
+  findPublicByUsername,
+  updateProfileById,
+} from '../services/userService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
 import type { PublicUser } from '@mpg/shared/types/user.js';
+
+const MAX_LIMIT = 50;
+const DEFAULT_LIMIT = 20;
+
+const toIsoOrUndefined = (value: Date | null): string | undefined =>
+  value ? value.toISOString() : undefined;
 
 /* ------------------------------------------------------------------ */
 /*  GET /api/users/:username — Public profile                          */
@@ -18,16 +30,14 @@ export const getPublicProfile = async (
   try {
     const username = req.params.username as string;
 
-    const user = await User.findOne({
-      username: username.toLowerCase(),
-    }).lean();
-
+    const user = await findPublicByUsername(username);
     if (!user) {
       sendError(res, 'User not found', 404);
       return;
     }
 
     const publicUser: PublicUser = {
+      id: user.id,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
@@ -38,18 +48,8 @@ export const getPublicProfile = async (
 
     if (user.preferences?.privacy?.showStats !== false) {
       publicUser.stats = user.stats;
-
-      const statsByGame: Record<string, typeof user.stats> = {};
-      if (user.statsByGame instanceof Map) {
-        user.statsByGame.forEach((val, key) => {
-          statsByGame[key] = val;
-        });
-      } else if (user.statsByGame && typeof user.statsByGame === 'object') {
-        Object.assign(statsByGame, user.statsByGame);
-      }
-
-      if (Object.keys(statsByGame).length > 0) {
-        publicUser.statsByGame = statsByGame;
+      if (user.statsByGame && Object.keys(user.statsByGame).length > 0) {
+        publicUser.statsByGame = user.statsByGame as Record<string, typeof user.stats>;
       }
     }
 
@@ -69,13 +69,12 @@ export const getMyProfile = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const user = await User.findById(req.user!._id);
+    const user = await findPublicById(req.user!._id);
     if (!user) {
       sendError(res, 'User not found', 404);
       return;
     }
-
-    sendSuccess(res, { user: user.toJSON() });
+    sendSuccess(res, { user });
   } catch (err) {
     next(err);
   }
@@ -96,17 +95,8 @@ export const updateMyProfile = async (
       bio?: string;
     };
 
-    const user = await User.findById(req.user!._id);
-    if (!user) {
-      sendError(res, 'User not found', 404);
-      return;
-    }
-
-    if (displayName !== undefined) user.displayName = displayName;
-    if (bio !== undefined) user.bio = bio;
-
-    await user.save();
-    sendSuccess(res, { user: user.toJSON() }, 'Profile updated');
+    const user = await updateProfileById(req.user!._id, { displayName, bio });
+    sendSuccess(res, { user }, 'Profile updated');
   } catch (err) {
     next(err);
   }
@@ -116,9 +106,6 @@ export const updateMyProfile = async (
 /*  GET /api/users/:username/matches — User match history (public)     */
 /* ------------------------------------------------------------------ */
 
-const MAX_LIMIT = 50;
-const DEFAULT_LIMIT = 20;
-
 export const getUserMatches = async (
   req: Request,
   res: Response,
@@ -127,34 +114,50 @@ export const getUserMatches = async (
   try {
     const username = req.params.username as string;
 
-    const user = await User.findOne({
-      username: username.toLowerCase(),
-    })
-      .select('_id')
-      .lean();
-
+    const user = await findPublicByUsername(username);
     if (!user) {
       sendError(res, 'User not found', 404);
       return;
     }
 
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query.limit) || DEFAULT_LIMIT));
-    const skip = (page - 1) * limit;
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(req.query.limit) || DEFAULT_LIMIT),
+    );
+    const offset = (page - 1) * limit;
 
-    const filter = { 'players.userId': String(user._id) };
+    const containsClause = sql`${matches.players} @> ${JSON.stringify([{ userId: user.id }])}::jsonb`;
 
-    const [matches, total] = await Promise.all([
-      Match.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
+    const [rows, totalRows] = await Promise.all([
+      db
+        .select()
+        .from(matches)
+        .where(containsClause)
+        .orderBy(desc(matches.createdAt))
         .limit(limit)
-        .lean(),
-      Match.countDocuments(filter),
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(matches)
+        .where(containsClause),
     ]);
 
+    const total = totalRows[0]?.count ?? 0;
+
     sendSuccess(res, {
-      matches,
+      matches: rows.map((m) => ({
+        id: m.id,
+        roomCode: m.roomCode,
+        gameType: m.gameType,
+        players: m.players,
+        result: m.result,
+        duration: m.duration,
+        totalRounds: m.totalRounds,
+        startedAt: m.startedAt.toISOString(),
+        endedAt: m.endedAt.toISOString(),
+        createdAt: m.createdAt.toISOString(),
+      })),
       pagination: {
         page,
         limit,
@@ -162,13 +165,15 @@ export const getUserMatches = async (
         totalPages: Math.ceil(total / limit),
       },
     });
+
+    void toIsoOrUndefined;
   } catch (err) {
     next(err);
   }
 };
 
 /* ------------------------------------------------------------------ */
-/*  POST /api/users/me/avatar — Upload avatar                         */
+/*  POST /api/users/me/avatar — Upload avatar                          */
 /* ------------------------------------------------------------------ */
 
 const deleteFileIfExists = async (filePath: string): Promise<void> => {
@@ -190,21 +195,23 @@ export const uploadAvatarHandler = async (
       return;
     }
 
-    const user = await User.findById(req.user!._id);
-    if (!user) {
+    const current = await findPublicById(req.user!._id);
+    if (!current) {
       sendError(res, 'User not found', 404);
       return;
     }
 
-    if (user.avatarUrl) {
-      const oldPath = path.join(process.cwd(), user.avatarUrl);
+    if (current.avatarUrl) {
+      const oldPath = path.join(process.cwd(), current.avatarUrl);
       await deleteFileIfExists(oldPath);
     }
 
-    user.avatarUrl = `/uploads/avatars/${req.file.filename}`;
-    await user.save();
+    const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const updated = await updateProfileById(req.user!._id, {
+      avatarUrl: newAvatarUrl,
+    });
 
-    sendSuccess(res, { avatarUrl: user.avatarUrl }, 'Avatar uploaded');
+    sendSuccess(res, { avatarUrl: updated.avatarUrl }, 'Avatar uploaded');
   } catch (err) {
     next(err);
   }
@@ -220,20 +227,18 @@ export const removeAvatar = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const user = await User.findById(req.user!._id);
-    if (!user) {
+    const current = await findPublicById(req.user!._id);
+    if (!current) {
       sendError(res, 'User not found', 404);
       return;
     }
 
-    if (user.avatarUrl) {
-      const filePath = path.join(process.cwd(), user.avatarUrl);
+    if (current.avatarUrl) {
+      const filePath = path.join(process.cwd(), current.avatarUrl);
       await deleteFileIfExists(filePath);
     }
 
-    user.avatarUrl = '';
-    await user.save();
-
+    await updateProfileById(req.user!._id, { avatarUrl: '' });
     sendSuccess(res, null, 'Avatar removed');
   } catch (err) {
     next(err);

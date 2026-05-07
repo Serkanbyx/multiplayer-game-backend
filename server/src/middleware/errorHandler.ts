@@ -7,8 +7,47 @@ interface AppError extends Error {
   statusCode?: number;
   isOperational?: boolean;
   errors?: Array<{ field: string; message: string }>;
-  code?: number; // Mongoose duplicate key error code
 }
+
+/**
+ * `postgres-js` and `pg` both surface PostgreSQL errors with a 5-character
+ * SQLSTATE code on the `code` field. We only special-case the codes that map
+ * to user-facing 4xx responses; everything else stays a generic 500.
+ */
+interface PostgresError extends AppError {
+  code?: string;
+  detail?: string;
+  constraint?: string;
+  table?: string;
+  column?: string;
+}
+
+const isPostgresError = (err: unknown): err is PostgresError => {
+  if (!err || typeof err !== 'object') return false;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code);
+};
+
+const mapPostgresError = (
+  err: PostgresError,
+): { statusCode: number; message: string } | null => {
+  switch (err.code) {
+    case '23505': // unique_violation
+      return { statusCode: 409, message: 'A record with that value already exists' };
+    case '23503': // foreign_key_violation
+      return { statusCode: 409, message: 'Referenced resource not found' };
+    case '23502': // not_null_violation
+      return { statusCode: 400, message: 'Missing required field' };
+    case '23514': // check_violation
+      return { statusCode: 400, message: 'Validation failed' };
+    case '22P02': // invalid_text_representation (e.g. invalid uuid)
+      return { statusCode: 400, message: 'Invalid resource identifier' };
+    case '22001': // string_data_right_truncation
+      return { statusCode: 400, message: 'Field value too long' };
+    default:
+      return null;
+  }
+};
 
 export const errorHandler = (
   err: unknown,
@@ -16,7 +55,6 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction,
 ): void => {
-  // Multer errors (file upload) — checked before casting to AppError
   if (err instanceof multer.MulterError) {
     console.error('Multer Error:', err.code, err.message);
     let message: string;
@@ -32,37 +70,33 @@ export const errorHandler = (
 
   const error = err as AppError;
 
-  console.error('Error:', error.message, env.NODE_ENV === 'development' ? error.stack : '');
+  console.error(
+    'Error:',
+    error.message,
+    env.NODE_ENV === 'development' ? error.stack : '',
+  );
 
   let statusCode = error.statusCode ?? 500;
   let message = error.isOperational ? error.message : 'Internal server error';
   const errors = error.errors;
 
-  // Custom Multer fileFilter rejection
   if (error.message === 'UNSUPPORTED_MIME') {
     statusCode = 400;
     message = 'Unsupported file type — only JPEG, PNG, and WebP are allowed';
   }
 
-  // Mongoose duplicate key
-  if (error.code === 11000) {
-    statusCode = 409;
-    message = 'A record with that value already exists';
+  if (isPostgresError(err)) {
+    const mapped = mapPostgresError(err);
+    if (mapped) {
+      statusCode = mapped.statusCode;
+      message = mapped.message;
+    } else {
+      // Unknown SQLSTATE — log internally but don't leak to client
+      statusCode = 500;
+      message = 'Internal server error';
+    }
   }
 
-  // Mongoose validation error
-  if (error.name === 'ValidationError') {
-    statusCode = 400;
-    message = 'Validation failed';
-  }
-
-  // Mongoose CastError (invalid ObjectId, etc.)
-  if (error.name === 'CastError') {
-    statusCode = 400;
-    message = 'Invalid resource identifier';
-  }
-
-  // JWT errors
   if (error.name === 'JsonWebTokenError') {
     statusCode = 401;
     message = 'Not authenticated';
@@ -77,7 +111,8 @@ export const errorHandler = (
     success: false,
     message,
     ...(errors && { errors }),
-    ...(env.NODE_ENV === 'development' && statusCode === 500 && { stack: error.stack }),
+    ...(env.NODE_ENV === 'development' &&
+      statusCode === 500 && { stack: error.stack }),
   } as ApiResponse<never>;
 
   res.status(statusCode).json(body);

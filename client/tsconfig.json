@@ -4,7 +4,7 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
-    "baseUrl": ".",
+    "allowImportingTsExtensions": true,
     "paths": { "@mpg/shared/*": ["../shared/*"] },
     "types": ["vite/client"]
   },

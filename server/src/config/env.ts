@@ -5,7 +5,7 @@ type NodeEnv = 'development' | 'production' | 'test';
 interface Env {
   NODE_ENV: NodeEnv;
   PORT: number;
-  MONGO_URI: string;
+  DATABASE_URL: string;
   REDIS_URL: string;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
@@ -72,7 +72,7 @@ if (BCRYPT_SALT_ROUNDS < 10) {
 export const env: Env = {
   NODE_ENV,
   PORT: toPositiveInt('PORT', 5000),
-  MONGO_URI: requiredString('MONGO_URI'),
+  DATABASE_URL: requiredString('DATABASE_URL'),
   REDIS_URL: requiredString('REDIS_URL'),
   JWT_SECRET,
   JWT_EXPIRES_IN: optionalString('JWT_EXPIRES_IN', '7d'),

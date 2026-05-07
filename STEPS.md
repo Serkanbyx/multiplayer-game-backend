@@ -86,7 +86,7 @@
 - STEP 52 — README & Architecture Documentation
 - STEP 53 — CI/CD (GitHub Actions: typecheck + lint + test on PR)
 - STEP 54 — Code Cleanup & Pre-Deploy Review
-- STEP 55 — Production Deployment (Render + Netlify + Redis Cloud + Neon Postgres + optional Sentry)
+- STEP 55 — Production Deployment (Render + Vercel + Redis Cloud + Neon Postgres + optional Sentry)
 
 ---
 
@@ -213,8 +213,8 @@ server/
 ```
 client/
 ├── public/
-│   ├── sounds/                  # turn.mp3, win.mp3, lose.mp3, click.mp3
-│   └── _redirects               # SPA fallback for Netlify
+│   └── sounds/                  # turn.mp3, win.mp3, lose.mp3, click.mp3
+├── vercel.json                  # SPA rewrite + asset cache headers (Vercel)
 ├── src/
 │   ├── api/
 │   │   ├── axios.ts             # AxiosInstance with interceptors
@@ -492,7 +492,7 @@ export default defineConfig({
 2. Validate env (`config/env.js` import auto-validates).
 3. `app.disable('x-powered-by')`.
 4. `app.use(helmet())`.
-5. `app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true, methods: ['GET','POST','PUT','PATCH','DELETE'] }))`.
+5. `app.use(cors({ origin: corsOriginCheck, credentials: true, methods: ['GET','POST','PUT','PATCH','DELETE'] }))` where `corsOriginCheck(origin, cb)` allows: `undefined` (curl/health checks), the exact `env.CLIENT_ORIGIN`, and — in non-production only — any `*.vercel.app` subdomain so preview deployments work. Reject everything else with `cb(new Error('Not allowed by CORS'))`. This same check is reused by Socket.io's `cors` option in Step 11 to keep one source of truth.
 6. `app.use(express.json({ limit: '10kb' }))`.
 7. `app.use(express.urlencoded({ extended: true, limit: '10kb' }))`.
 8. `app.use(sanitizeMiddleware)` — strips prototype-pollution keys and clamps depth (see snippet).
@@ -3097,7 +3097,7 @@ Top-level `README.md` with the following sections:
 ```
                   ┌─────────────┐
                   │   Client    │  React 19 + Vite + TypeScript
-                  │  (Netlify)  │  socket.io-client (typed)
+                  │  (Vercel)   │  socket.io-client (typed)
                   └──────┬──────┘
                          │  HTTPS REST + WSS
                          │  (shared/ types ensure contract)
@@ -3168,8 +3168,8 @@ services:
 Integration test env vars set to `postgresql://postgres:postgres@localhost:5432/test_mpg` and `redis://localhost:6379`. The CI job declares a `services.postgres: postgres:16-alpine` container with health-check, then runs `npm run db:migrate` before `npm test` to apply the latest schema. Redis service is `services.redis: redis:7-alpine`.
 
 **`.github/workflows/deploy-preview.yml`** — on PR open/update:
-- Build client → deploy to a Netlify deploy preview (uses Netlify GitHub App; no extra workflow needed if app is installed).
-- Comment the preview URL on the PR (Netlify does this automatically).
+- Build client → deploy to a Vercel **Preview Deployment** (uses Vercel's GitHub integration; no extra workflow needed once the project is imported and the GitHub App is installed).
+- Comment the preview URL on the PR (the Vercel bot does this automatically).
 
 **Branch protection on `main`:**
 - Require all three CI jobs to pass.
@@ -3178,7 +3178,7 @@ Integration test env vars set to `postgresql://postgres:postgres@localhost:5432/
 - Disable force pushes.
 
 **Secret management:**
-- All real secrets (`DATABASE_URL`, `JWT_SECRET`, etc.) live only in Render/Netlify env vars — never in GitHub Actions secrets unless needed by deploy workflows. CI uses local service containers and dummy secrets.
+- All real secrets (`DATABASE_URL`, `JWT_SECRET`, etc.) live only in Render/Vercel env vars — never in GitHub Actions secrets unless needed by deploy workflows. CI uses local service containers and dummy secrets.
 
 **Status badge in README:**
 
@@ -3214,7 +3214,7 @@ Integration test env vars set to `postgresql://postgres:postgres@localhost:5432/
 
 ---
 
-## STEP 55 — Deployment (Render + Netlify + Redis Cloud + Neon Postgres + optional Sentry)
+## STEP 55 — Deployment (Render + Vercel + Redis Cloud + Neon Postgres + optional Sentry)
 
 **Neon Postgres:**
 - Create project on [neon.tech](https://neon.tech) free tier (0.5 GB storage, 100 compute hours/month, autosuspend after 5 min idle).
@@ -3242,17 +3242,24 @@ This applies pending migrations once before the new server instance starts handl
 - Start command: `node dist/src/server.js`.
 - **Critical:** Render must have access to the `shared/` folder during build. Since `server/tsconfig.json` references `../shared`, configure Render's root directory as the **repo root** (not `server/`) and override the build/start paths: build = `cd server && npm install && npm run build`, start = `cd server && node dist/src/server.js`. Alternative: keep `server/` as root and copy `shared/` into `server/shared/` via a `prebuild` script.
 - Plan that supports **WebSockets** (Render's free Web Service does support WebSockets — confirm).
-- Env vars: every key from `.env.example` plus `JWT_SECRET` (generated, ≥ 32 chars), `NODE_ENV=production`, `CLIENT_ORIGIN=https://<your-netlify-domain>`, `DATABASE_URL` (Neon pooled connection), `REDIS_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME`.
+- Env vars: every key from `.env.example` plus `JWT_SECRET` (generated, ≥ 32 chars), `NODE_ENV=production`, `CLIENT_ORIGIN=https://<your-vercel-domain>` (e.g. `https://multiplayer-game.vercel.app` — and any custom domain), `DATABASE_URL` (Neon pooled connection), `REDIS_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME`.
+- Note on Vercel preview URLs: every PR gets a unique `*.vercel.app` subdomain. To allow them through CORS, either (a) accept all `*.vercel.app` subdomains in `corsOptions.origin` via a regex check, or (b) keep CORS strict to the production URL and rely on Vercel preview deploys hitting a separate staging Render service with its own `CLIENT_ORIGIN` regex. The simplest portfolio choice is option (a) — see Step 5 CORS notes.
 - Health check path: `/api/health`.
 - Run admin seed once via Render Shell: `cd server && npx tsx src/seed/seedAdmin.ts` (or after build: `node dist/src/seed/seedAdmin.js`).
 
-**Netlify (frontend):**
-- Repo connected, base directory: leave as repo root, then set Netlify build settings explicitly:
-  - Build command: `cd client && npm install && npm run build`
-  - Publish directory: `client/dist`
-- Build automatically runs `tsc --noEmit && vite build` — **type errors fail the deploy**, which is exactly what we want.
-- Env vars: `VITE_API_URL=https://<render-domain>/api`, `VITE_SOCKET_URL=https://<render-domain>`.
-- `client/public/_redirects` already has `/* /index.html 200` for SPA fallback (committed with the repo, not Netlify-side config).
+**Vercel (frontend):**
+- Repo connected through the Vercel dashboard → **Add New… → Project → Import Git Repository**.
+- **Root Directory:** `client/` (Vercel auto-detects Vite and uses the `client/vercel.json` we ship in the repo).
+- Framework Preset: `Vite` (auto-detected). Override only if needed:
+  - Install Command: `npm install`
+  - Build Command: `npm run build`
+  - Output Directory: `dist`
+- Node.js version: 20.x (Settings → General → Node.js Version).
+- Build runs `tsc --noEmit && vite build` from `client/package.json` — **type errors fail the deploy**, which is exactly what we want.
+- Env vars (Settings → Environment Variables, scope = Production + Preview): `VITE_API_URL=https://<render-domain>/api`, `VITE_SOCKET_URL=https://<render-domain>`.
+- SPA fallback + caching: handled by `client/vercel.json` (rewrites every path to `/index.html`, sets `Cache-Control: public, max-age=31536000, immutable` on `/assets/*`, plus `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy` headers). Committed to the repo — no dashboard config required.
+- Optional: enable **Vercel Analytics** (free tier, anonymized) for Web Vitals.
+- Optional CLI workflow: `npm i -g vercel` → `cd client && vercel link` → `vercel --prod` for a manual production deploy. Pushing to `main` is the recommended path; CLI is only for hotfixes.
 
 **Post-deploy verification:**
 

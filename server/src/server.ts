@@ -7,6 +7,7 @@ import cors from 'cors';
 import { sql } from 'drizzle-orm';
 
 import { env } from './config/env.js';
+import { corsOptions } from './config/corsOptions.js';
 import { db, dbClient } from './db/index.js';
 import { redis } from './config/redis.js';
 import { sanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
@@ -21,13 +22,7 @@ app.disable('x-powered-by');
 
 app.use(helmet());
 
-app.use(
-  cors({
-    origin: env.CLIENT_ORIGIN,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  }),
-);
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));

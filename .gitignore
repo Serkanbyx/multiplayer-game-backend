@@ -13,3 +13,6 @@ server/uploads/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Vercel CLI (linked-project metadata + local env pulled by `vercel env pull`)
+.vercel/

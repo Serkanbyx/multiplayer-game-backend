@@ -1,1 +1,8 @@
-// Game constants: GAME_TYPES, ROOM_TTL, MAX_PLAYERS — implemented in Step 2
+export const ROOM_TTL_SECONDS = 7200;
+export const MATCHMAKING_TTL_SECONDS = 300;
+export const MAX_CHAT_MESSAGES = 50;
+export const MAX_SPECTATORS = 10;
+export const MAX_PLAYERS: Record<string, number> = {
+  "tic-tac-toe": 2,
+  "card-game": 4,
+};

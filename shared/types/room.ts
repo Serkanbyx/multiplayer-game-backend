@@ -1,29 +1,41 @@
-import type { GameType } from "./games.js";
+import type { GameType, GameState } from "./games.js";
 
 export type RoomStatus = "waiting" | "playing" | "finished";
 
-export interface Room {
-  code: string;
-  hostId: string;
-  gameType: GameType;
-  status: RoomStatus;
-  players: RoomPlayer[];
-  spectators: RoomSpectator[];
-  maxPlayers: number;
-  isPrivate: boolean;
-  createdAt: string;
-}
-
 export interface RoomPlayer {
-  id: string;
+  userId: string;
   displayName: string;
-  avatar?: string;
   isGuest: boolean;
-  isReady: boolean;
+  avatarUrl: string | null;
+  position: number;
   isConnected: boolean;
 }
 
 export interface RoomSpectator {
-  id: string;
+  userId: string;
   displayName: string;
+}
+
+export interface ChatMessage {
+  userId: string;
+  displayName: string;
+  text: string;
+  timestamp: number;
+}
+
+export interface Room {
+  roomCode: string;
+  gameType: GameType;
+  isPrivate: boolean;
+  status: RoomStatus;
+  hostId: string;
+  maxPlayers: number;
+  players: RoomPlayer[];
+  spectators: RoomSpectator[];
+  gameState: GameState | null;
+  chat: ChatMessage[];
+  rematchVotes: string[];
+  createdAt: number;
+  startedAt: number | null;
+  endedAt: number | null;
 }

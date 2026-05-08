@@ -4,6 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import { Server } from 'socket.io';
 import { sql } from 'drizzle-orm';
 
 import { env } from './config/env.js';
@@ -18,6 +19,9 @@ import userRouter from './routes/userRoutes.js';
 import matchRouter from './routes/matchRoutes.js';
 import leaderboardRouter from './routes/leaderboardRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
+import type { ClientToServerEvents, ServerToClientEvents, SocketData } from '@mpg/shared/types/events.js';
+import { registerSocketHandlers } from './socket/index.js';
+import { setIo } from './socket/io.js';
 
 const app = express();
 
@@ -69,8 +73,17 @@ app.use(errorHandler);
 
 const httpServer = http.createServer(app);
 
+const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(httpServer, {
+  cors: { origin: env.CLIENT_ORIGIN, credentials: true },
+  pingTimeout: 20_000,
+  pingInterval: 25_000,
+  maxHttpBufferSize: 1e5,
+});
+
+setIo(io);
+registerSocketHandlers(io);
+
 const bootstrap = async (): Promise<void> => {
-  // Verify DB reachability at startup; fail fast if Postgres is unreachable.
   await db.execute(sql`SELECT 1`);
   console.log('Postgres connection verified');
 
@@ -101,4 +114,4 @@ bootstrap().catch((err) => {
   process.exit(1);
 });
 
-export { app, httpServer };
+export { app, httpServer, io };

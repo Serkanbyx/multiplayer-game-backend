@@ -4,12 +4,21 @@ import type { AuthUser } from "./auth.js";
 
 /** Client → Server socket events */
 export interface ClientToServerEvents {
-  "room:create": (data: { gameType: GameType; isPrivate: boolean }, callback: (response: { success: boolean; room?: Room; error?: string }) => void) => void;
-  "room:join": (data: { roomCode: string }, callback: (response: { success: boolean; room?: Room; error?: string }) => void) => void;
+  "room:create": (
+    data: { gameType: GameType; isPrivate: boolean },
+    callback: (response: { success: boolean; room?: Room; error?: string }) => void,
+  ) => void;
+  "room:join": (
+    data: { roomCode: string },
+    callback: (response: { success: boolean; room?: Room; error?: string }) => void,
+  ) => void;
   "room:leave": () => void;
   "room:ready": () => void;
   "room:start": () => void;
-  "room:spectate": (data: { roomCode: string }, callback: (response: { success: boolean; room?: Room; error?: string }) => void) => void;
+  "room:spectate": (
+    data: { roomCode: string },
+    callback: (response: { success: boolean; room?: Room; error?: string }) => void,
+  ) => void;
 
   "game:action": (action: GameAction) => void;
   "game:rematch-request": () => void;
@@ -48,4 +57,9 @@ export interface ServerToClientEvents {
   "user:online-status": (data: { userId: string; isOnline: boolean }) => void;
 
   "error": (data: { message: string; code?: string }) => void;
+}
+
+/** Attached to each socket after auth handshake */
+export interface SocketData {
+  user: AuthUser;
 }

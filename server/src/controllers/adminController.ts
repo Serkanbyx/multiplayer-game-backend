@@ -367,9 +367,7 @@ export const forceCloseRoom = async (
       const { getIo } = await import('../socket/io.js');
       const io = getIo();
       if (io) {
-        io.to(roomCode).emit('room_closed', {
-          reason: 'Room closed by admin',
-        });
+        io.to(roomCode).emit('room:closed');
         const sockets = await io.in(roomCode).fetchSockets();
         for (const socket of sockets) {
           socket.leave(roomCode);

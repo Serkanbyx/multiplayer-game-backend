@@ -79,6 +79,18 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
         return callback({ success: false, error: 'Room not found' });
       }
 
+      /* ── Spectator path ─────────────────────────────────────── */
+      if (data.asSpectator) {
+        const spectator = buildSpectator(socket);
+        const updatedRoom = await roomService.addSpectator(data.roomCode, spectator);
+
+        socket.join(socketRoomChannel(data.roomCode));
+        io.in(socketRoomChannel(data.roomCode)).emit('room:updated', updatedRoom);
+
+        return callback({ success: true, room: updatedRoom });
+      }
+
+      /* ── Player path ────────────────────────────────────────── */
       const player = buildPlayer(socket, room.players.length);
       const updatedRoom = await roomService.addPlayer(data.roomCode, player);
 

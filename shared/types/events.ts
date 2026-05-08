@@ -9,7 +9,7 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; room?: Room; error?: string }) => void,
   ) => void;
   "room:join": (
-    data: { roomCode: string },
+    data: { roomCode: string; asSpectator?: boolean },
     callback: (response: { success: boolean; room?: Room; error?: string }) => void,
   ) => void;
   "room:leave": () => void;

@@ -84,4 +84,4 @@ See `STEPS.md` (Step 55) for detailed deployment instructions.
 
 ## License
 
-MIT
+[PolyForm Noncommercial 1.0.0](LICENSE)

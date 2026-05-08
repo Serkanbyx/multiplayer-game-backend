@@ -16,6 +16,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRouter from './routes/authRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import matchRouter from './routes/matchRoutes.js';
+import leaderboardRouter from './routes/leaderboardRoutes.js';
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/matches', matchRouter);
+app.use('/api/leaderboard', leaderboardRouter);
 
 app.use(errorHandler);
 

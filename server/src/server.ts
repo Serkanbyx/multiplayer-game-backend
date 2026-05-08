@@ -17,6 +17,7 @@ import authRouter from './routes/authRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import matchRouter from './routes/matchRoutes.js';
 import leaderboardRouter from './routes/leaderboardRoutes.js';
+import adminRouter from './routes/adminRoutes.js';
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/matches', matchRouter);
 app.use('/api/leaderboard', leaderboardRouter);
+app.use('/api/admin', adminRouter);
 
 app.use(errorHandler);
 

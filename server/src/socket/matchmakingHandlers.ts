@@ -1,19 +1,50 @@
 import type { TypedServer, TypedSocket } from './index.js';
+import { GameFactory } from '../games/GameFactory.js';
+import * as matchmakingService from '../services/matchmakingService.js';
 
 export const registerMatchmakingHandlers = (io: TypedServer, socket: TypedSocket): void => {
-  socket.on('matchmaking:join', (data) => {
+  const user = socket.data.user;
+
+  /* ── matchmaking:join ───────────────────────────────────────── */
+
+  socket.on('matchmaking:join', async (data) => {
     try {
-      // TODO: Step 13 — matchmaking queue logic
-    } catch {
-      socket.emit('error', { code: 'MATCHMAKING_JOIN_FAILED', message: 'Failed to join matchmaking' });
+      if (!GameFactory.isValidGameType(data.gameType)) {
+        return socket.emit('error', {
+          code: 'INVALID_GAME_TYPE',
+          message: 'Invalid game type',
+        });
+      }
+
+      const { position } = await matchmakingService.joinQueue({
+        user,
+        gameType: data.gameType,
+      });
+
+      socket.emit('matchmaking:searching', {
+        gameType: data.gameType,
+        estimatedWait: position * 5,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to join matchmaking';
+      socket.emit('error', { code: 'MATCHMAKING_JOIN_FAILED', message });
     }
   });
 
-  socket.on('matchmaking:leave', () => {
+  /* ── matchmaking:leave ──────────────────────────────────────── */
+
+  socket.on('matchmaking:leave', async () => {
     try {
-      // TODO: Step 13 — leave matchmaking queue
-    } catch {
-      socket.emit('error', { code: 'MATCHMAKING_LEAVE_FAILED', message: 'Failed to leave matchmaking' });
+      const validGameTypes = ['tic-tac-toe', 'card-game'] as const;
+
+      for (const gameType of validGameTypes) {
+        await matchmakingService.cancelQueue({ user, gameType });
+      }
+
+      socket.emit('matchmaking:cancelled');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to leave matchmaking';
+      socket.emit('error', { code: 'MATCHMAKING_LEAVE_FAILED', message });
     }
   });
 };

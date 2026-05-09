@@ -1,5 +1,6 @@
 import type { TypedServer, TypedSocket } from './index.js';
 import * as roomService from '../services/roomService.js';
+import * as matchmakingService from '../services/matchmakingService.js';
 import { handleAbortOnLeave } from './gameHandlers.js';
 
 const socketRoomChannel = (roomCode: string) => `room:${roomCode}`;
@@ -10,6 +11,8 @@ export const registerDisconnectHandlers = (io: TypedServer, socket: TypedSocket)
     console.log(`Socket disconnected: ${user.displayName} (${user._id}) — ${reason}`);
 
     try {
+      await matchmakingService.cleanupOnDisconnect(user._id);
+
       const roomCode = await roomService.getUserRoom(user._id);
       if (!roomCode) return;
 

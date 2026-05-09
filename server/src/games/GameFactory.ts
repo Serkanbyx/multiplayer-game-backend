@@ -1,34 +1,30 @@
-import type { GameType } from "../../../shared/types/games.js";
+import { TicTacToe } from './TicTacToe.js';
+import { CardGame } from './CardGame.js';
+import type { GameType } from '../../../shared/types/games.js';
+import type { RoomPlayer } from '../../../shared/types/room.js';
+import type { GameConfig } from './BaseGame.js';
 
-export interface GameConfig {
-  maxPlayers: number;
-  minPlayers: number;
-  turnTimeoutMs: number;
-}
-
-const configs: Record<GameType, GameConfig> = {
-  "tic-tac-toe": {
-    maxPlayers: 2,
-    minPlayers: 2,
-    turnTimeoutMs: 30_000,
-  },
-  "card-game": {
-    maxPlayers: 4,
-    minPlayers: 2,
-    turnTimeoutMs: 60_000,
-  },
-};
-
-const VALID_GAME_TYPES = new Set<string>(Object.keys(configs));
+type Registry = { tictactoe: typeof TicTacToe; cardgame: typeof CardGame };
+const REGISTRY: Registry = { tictactoe: TicTacToe, cardgame: CardGame };
 
 export const GameFactory = {
+  create<T extends GameType>(gameType: T, players: RoomPlayer[]): InstanceType<Registry[T]> {
+    const Cls = REGISTRY[gameType];
+    if (!Cls) throw new Error('UNKNOWN_GAME_TYPE');
+    return new Cls({ players }) as InstanceType<Registry[T]>;
+  },
+
   getConfig(gameType: GameType): GameConfig {
-    const config = configs[gameType];
-    if (!config) throw new Error(`Unknown game type: ${gameType}`);
-    return config;
+    const Cls = REGISTRY[gameType];
+    if (!Cls) throw new Error('UNKNOWN_GAME_TYPE');
+    return Cls.getConfig();
   },
 
   isValidGameType(value: unknown): value is GameType {
-    return typeof value === "string" && VALID_GAME_TYPES.has(value);
+    return typeof value === 'string' && value in REGISTRY;
+  },
+
+  list(): GameType[] {
+    return Object.keys(REGISTRY) as GameType[];
   },
 };

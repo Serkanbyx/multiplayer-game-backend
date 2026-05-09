@@ -39,12 +39,12 @@ export interface ServerToClientEvents {
   "room:kicked": (data: { reason: string }) => void;
   "room:closed": () => void;
 
-  "game:started": (data: { gameState: GameState; gameType: GameType }) => void;
-  "game:state-updated": (gameState: GameState) => void;
-  "game:ended": (data: { result: { outcome: string; winnerId?: string }; finalState: GameState }) => void;
-  "game:rematch-requested": (data: { requestedBy: string }) => void;
-  "game:rematch-accepted": () => void;
-  "game:rematch-declined": () => void;
+  "game:started": (data: { roomCode: string; gameState: GameState }) => void;
+  "game:state-updated": (data: { roomCode: string; gameState: GameState }) => void;
+  "game:ended": (data: { roomCode: string; result: 'win' | 'draw'; winnerId: string | null; reason: string }) => void;
+  "game:rematch-requested": (data: { userId: string; votes: string[] }) => void;
+  "game:rematch-accepted": (data: { userId: string; votes: string[] }) => void;
+  "game:rematch-declined": (data: { userId: string }) => void;
   "game:timer-update": (data: { playerId: string; remainingMs: number }) => void;
 
   "chat:message": (data: { senderId: string; senderName: string; message: string; timestamp: string }) => void;

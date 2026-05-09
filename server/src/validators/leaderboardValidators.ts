@@ -7,8 +7,8 @@ import { query, type ValidationChain } from 'express-validator';
 export const leaderboardValidator: ValidationChain[] = [
   query('gameType')
     .optional()
-    .isIn(['tic-tac-toe', 'card-game'])
-    .withMessage('gameType must be tic-tac-toe or card-game'),
+    .isIn(['tictactoe', 'cardgame'])
+    .withMessage('gameType must be tictactoe or cardgame'),
   query('page')
     .optional()
     .isInt({ min: 1 })

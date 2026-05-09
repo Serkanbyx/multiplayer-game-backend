@@ -1,37 +1,36 @@
-export type GameType = "tic-tac-toe" | "card-game";
+export type GameType = 'tictactoe' | 'cardgame';
 
-/** Tic-Tac-Toe cell value: null = empty, "X" or "O" */
-export type Cell = "X" | "O" | null;
+export type Cell = null | 'X' | 'O';
+export type TicTacToeBoard = readonly [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell];
 
-export interface Card {
-  id: string;
-  suit: "hearts" | "diamonds" | "clubs" | "spades";
-  rank: string;
-  value: number;
-}
+export type Suit = '♠' | '♥' | '♦' | '♣';
+export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
+export type Card = { suit: Suit; rank: Rank };
 
-export interface TicTacToeState {
-  board: Cell[];
-  currentTurn: "X" | "O";
-  playerSymbols: Record<string, "X" | "O">;
+export type TicTacToeState = {
+  gameType: 'tictactoe';
+  board: TicTacToeBoard;
+  currentTurnUserId: string;
+  players: { userId: string; displayName: string; symbol: 'X' | 'O' }[];
   winner: string | null;
-  isDraw: boolean;
-  moveCount: number;
-}
+  result: 'win' | 'draw' | null;
+};
 
-export interface CardGameState {
-  hands: Record<string, Card[]>;
-  pile: Card[];
-  currentTurnPlayerId: string;
-  scores: Record<string, number>;
-  roundNumber: number;
-  maxRounds: number;
-  lastPlayedCard: Card | null;
-}
+export type CardGameState = {
+  gameType: 'cardgame';
+  players: { userId: string; displayName: string; position: 0 | 1 | 2 | 3; handCount: number; tricksWon: number }[];
+  myHand?: Card[];
+  currentTrick: { userId: string; card: Card }[];
+  leadSuit: Suit | null;
+  currentTurnUserId: string;
+  trickNumber: number;
+  result: 'win' | 'draw' | null;
+  winner: string | null;
+};
 
 export type GameState = TicTacToeState | CardGameState;
 
 export type GameAction =
-  | { type: "tic-tac-toe:place"; position: number }
-  | { type: "card-game:play"; cardId: string }
-  | { type: "card-game:draw" };
+  | { type: 'tictactoe:place'; position: number }
+  | { type: 'cardgame:play'; card: Card }
+  | { type: 'cardgame:draw' };

@@ -35,7 +35,7 @@ export const registerMatchmakingHandlers = (io: TypedServer, socket: TypedSocket
 
   socket.on('matchmaking:leave', async () => {
     try {
-      const validGameTypes = ['tic-tac-toe', 'card-game'] as const;
+      const validGameTypes = ['tictactoe', 'cardgame'] as const;
 
       for (const gameType of validGameTypes) {
         await matchmakingService.cancelQueue({ user, gameType });

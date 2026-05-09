@@ -3,6 +3,6 @@ export const MATCHMAKING_TTL_SECONDS = 300;
 export const MAX_CHAT_MESSAGES = 50;
 export const MAX_SPECTATORS = 10;
 export const MAX_PLAYERS: Record<string, number> = {
-  "tic-tac-toe": 2,
-  "card-game": 4,
+  tictactoe: 2,
+  cardgame: 4,
 };

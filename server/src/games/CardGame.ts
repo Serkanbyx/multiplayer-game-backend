@@ -70,18 +70,8 @@ export class CardGame extends BaseGame<CardGameState> {
 
   /* ─── State Accessors ──────────────────────────────────────── */
 
-  getStateFor(userId: string | null): CardGameState {
-    const state = this.getPublicState();
-    if (!userId) return state;
-
-    const player = this.players.find((p) => p.userId === userId);
-    if (player) {
-      return { ...state, myHand: [...player.hand] };
-    }
-    return state;
-  }
-
-  getPublicState(): CardGameState {
+  getStateFor(viewerUserId: string | null): CardGameState {
+    const me = viewerUserId ? this.players.find((p) => p.userId === viewerUserId) : null;
     return {
       gameType: 'cardgame',
       players: this.players.map((p) => ({
@@ -91,63 +81,69 @@ export class CardGame extends BaseGame<CardGameState> {
         handCount: p.hand.length,
         tricksWon: p.tricksWon,
       })),
-      currentTrick: [...this.currentTrick],
+      myHand: me ? [...me.hand] : undefined,
+      currentTrick: this.currentTrick.map((c) => ({ userId: c.userId, card: c.card })),
       leadSuit: this.leadSuit,
-      currentTurnUserId: this.getCurrentPlayerId(),
+      currentTurnUserId: this.players[this.currentTurnIndex]!.userId,
       trickNumber: this.trickNumber,
       result: this.result,
       winner: this.winner,
     };
   }
 
+  getPublicState(): CardGameState {
+    return this.getStateFor(null);
+  }
+
   /* ─── Core Action Handler ──────────────────────────────────── */
 
   applyAction(userId: string, action: string, payload: unknown): ActionResult {
-    if (this.isGameOver()) {
-      throw new Error('GAME_ALREADY_OVER');
+    if (this.result !== null) {
+      throw new Error('GAME_OVER');
     }
 
-    if (action !== 'play') {
-      throw new Error('INVALID_ACTION');
-    }
-
-    if (userId !== this.getCurrentPlayerId()) {
-      throw new Error('NOT_YOUR_TURN');
+    if (action !== 'play_card') {
+      throw new Error('UNKNOWN_ACTION');
     }
 
     if (!this.isValidPlayPayload(payload)) {
       throw new Error('INVALID_PAYLOAD');
     }
 
+    if (userId !== this.players[this.currentTurnIndex].userId) {
+      throw new Error('NOT_YOUR_TURN');
+    }
+
     const { card } = payload;
-    const player = this.players[this.currentTurnIndex]!;
+    const player = this.players[this.currentTurnIndex];
     const cardIndex = player.hand.findIndex((c) => c.suit === card.suit && c.rank === card.rank);
 
     if (cardIndex === -1) {
-      throw new Error('CARD_NOT_IN_HAND');
+      throw new Error('INVALID_CARD');
     }
 
-    if (this.leadSuit && card.suit !== this.leadSuit) {
+    if (this.currentTrick.length > 0 && this.leadSuit !== null) {
       const hasLeadSuit = player.hand.some((c) => c.suit === this.leadSuit);
-      if (hasLeadSuit) {
+      if (hasLeadSuit && card.suit !== this.leadSuit) {
         throw new Error('MUST_FOLLOW_SUIT');
       }
     }
 
     player.hand.splice(cardIndex, 1);
     this.currentTrick.push({ userId, card });
-    this.moves.push({ userId, card, trickNumber: this.trickNumber, t: Date.now() });
 
     if (this.currentTrick.length === 1) {
       this.leadSuit = card.suit;
     }
 
-    if (this.currentTrick.length === this.players.length) {
+    this.moves.push({ userId, card, trickNumber: this.trickNumber, t: Date.now() });
+
+    if (this.currentTrick.length === 4) {
       return this.resolveTrick();
     }
 
-    this.currentTurnIndex = ((this.currentTurnIndex + 1) % this.players.length) as 0 | 1 | 2 | 3;
-    return { stateChanged: true, gameOver: false };
+    this.currentTurnIndex = ((this.currentTurnIndex + 1) % 4) as 0 | 1 | 2 | 3;
+    return { stateChanged: true, gameOver: this.result !== null };
   }
 
   /* ─── Helpers ──────────────────────────────────────────────── */

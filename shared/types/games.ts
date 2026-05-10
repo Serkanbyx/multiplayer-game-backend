@@ -14,6 +14,7 @@ export type TicTacToeState = {
   players: { userId: string; displayName: string; symbol: 'X' | 'O' }[];
   winner: string | null;
   result: 'win' | 'draw' | null;
+  winningLine: readonly [number, number, number] | null;
 };
 
 export type CardGameState = {

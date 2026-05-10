@@ -2,39 +2,37 @@ import { BaseGame, type GameConfig, type ActionResult } from './BaseGame.js';
 import type { TicTacToeState, TicTacToeBoard, Cell } from '../../../shared/types/games.js';
 import type { RoomPlayer } from '../../../shared/types/room.js';
 
-type MoveEntry = { userId: string; position: number; symbol: 'X' | 'O'; timestamp: number };
-
-const WINNING_LINES = [
-  [0, 1, 2], [3, 4, 5], [6, 7, 8],
-  [0, 3, 6], [1, 4, 7], [2, 5, 8],
-  [0, 4, 8], [2, 4, 6],
-] as const;
-
-const EMPTY_BOARD: TicTacToeBoard = [null, null, null, null, null, null, null, null, null];
+type Player = { userId: string; displayName: string; symbol: 'X' | 'O' };
+type MoveEntry = { userId: string; index: number; symbol: 'X' | 'O'; t: number };
 
 export class TicTacToe extends BaseGame<TicTacToeState> {
   private board: Cell[];
-  private players: { userId: string; displayName: string; symbol: 'X' | 'O' }[];
-  private currentTurnIndex: number;
+  private players: [Player, Player];
+  private currentTurnIndex: 0 | 1;
   private winner: string | null = null;
   private result: 'win' | 'draw' | null = null;
-  private moveLog: MoveEntry[] = [];
+  private moves: MoveEntry[] = [];
 
   constructor({ players }: { players: RoomPlayer[] }) {
     super();
 
-    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    if (players.length !== 2) {
+      throw new Error('TicTacToe requires exactly 2 players');
+    }
+
     this.players = [
-      { userId: shuffled[0]!.userId, displayName: shuffled[0]!.displayName, symbol: 'X' },
-      { userId: shuffled[1]!.userId, displayName: shuffled[1]!.displayName, symbol: 'O' },
+      { userId: players[0]!.userId, displayName: players[0]!.displayName, symbol: 'X' },
+      { userId: players[1]!.userId, displayName: players[1]!.displayName, symbol: 'O' },
     ];
-    this.board = [...EMPTY_BOARD];
+    this.board = Array(9).fill(null) as Cell[];
     this.currentTurnIndex = 0;
   }
 
   static override getConfig(): GameConfig {
     return { gameType: 'tictactoe', minPlayers: 2, maxPlayers: 2 };
   }
+
+  /* ─── State Accessors ──────────────────────────────────────── */
 
   getStateFor(_userId: string | null): TicTacToeState {
     return this.getPublicState();
@@ -51,52 +49,57 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
     };
   }
 
+  /* ─── Core Action Handler ──────────────────────────────────── */
+
   applyAction(userId: string, action: string, payload: unknown): ActionResult {
-    if (this.isGameOver()) {
-      throw new Error('GAME_ALREADY_OVER');
+    if (this.result !== null) {
+      throw new Error('GAME_OVER');
     }
 
-    if (action !== 'place') {
-      throw new Error('INVALID_ACTION');
+    if (action !== 'play') {
+      throw new Error('UNKNOWN_ACTION');
     }
 
-    if (userId !== this.getCurrentPlayerId()) {
-      throw new Error('NOT_YOUR_TURN');
-    }
-
-    if (!this.isValidPlacePayload(payload)) {
+    if (typeof payload !== 'object' || payload === null || typeof (payload as Record<string, unknown>).index !== 'number') {
       throw new Error('INVALID_PAYLOAD');
     }
 
-    const { position } = payload;
-
-    if (this.board[position] !== null) {
-      throw new Error('CELL_OCCUPIED');
+    if (userId !== this.players[this.currentTurnIndex].userId) {
+      throw new Error('NOT_YOUR_TURN');
     }
 
-    const currentPlayer = this.players[this.currentTurnIndex]!;
-    this.board[position] = currentPlayer.symbol;
-    this.moveLog.push({ userId, position, symbol: currentPlayer.symbol, timestamp: Date.now() });
+    const { index } = payload as { index: number };
 
-    const won = this.checkWin(currentPlayer.symbol);
-    if (won) {
-      this.winner = userId;
-      this.result = 'win';
-      return { stateChanged: true, gameOver: true, result: 'win', winnerId: userId };
+    if (!Number.isInteger(index) || index < 0 || index > 8) {
+      throw new Error('INVALID_MOVE');
     }
 
-    const draw = this.board.every((cell) => cell !== null);
-    if (draw) {
-      this.result = 'draw';
-      return { stateChanged: true, gameOver: true, result: 'draw' };
+    if (this.board[index] !== null) {
+      throw new Error('INVALID_MOVE');
     }
 
-    this.currentTurnIndex = this.currentTurnIndex === 0 ? 1 : 0;
-    return { stateChanged: true, gameOver: false };
+    const currentPlayer = this.players[this.currentTurnIndex];
+    this.board[index] = currentPlayer.symbol;
+    this.moves.push({ userId, index, symbol: currentPlayer.symbol, t: Date.now() });
+
+    // Win/draw detection is added in Step 19 via #checkOutcome
+
+    if (this.result === null) {
+      this.currentTurnIndex = this.currentTurnIndex === 0 ? 1 : 0;
+    }
+
+    return {
+      stateChanged: true,
+      gameOver: this.result !== null,
+      result: this.result ?? undefined,
+      winnerId: this.winner ?? undefined,
+    };
   }
 
+  /* ─── Helpers ──────────────────────────────────────────────── */
+
   getCurrentPlayerId(): string {
-    return this.players[this.currentTurnIndex]!.userId;
+    return this.players[this.currentTurnIndex].userId;
   }
 
   isGameOver(): boolean {
@@ -111,8 +114,10 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
   }
 
   getMoveLog(): MoveEntry[] {
-    return [...this.moveLog];
+    return [...this.moves];
   }
+
+  /* ─── Serialization ────────────────────────────────────────── */
 
   serialize(): unknown {
     return {
@@ -121,18 +126,18 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
       currentTurnIndex: this.currentTurnIndex,
       winner: this.winner,
       result: this.result,
-      moveLog: this.moveLog,
+      moves: this.moves,
     };
   }
 
   static override deserialize(raw: unknown): TicTacToe {
     const data = raw as {
       board: Cell[];
-      players: { userId: string; displayName: string; symbol: 'X' | 'O' }[];
-      currentTurnIndex: number;
+      players: [Player, Player];
+      currentTurnIndex: 0 | 1;
       winner: string | null;
       result: 'win' | 'draw' | null;
-      moveLog: MoveEntry[];
+      moves: MoveEntry[];
     };
 
     const instance = Object.create(TicTacToe.prototype) as TicTacToe;
@@ -141,19 +146,7 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
     instance.currentTurnIndex = data.currentTurnIndex;
     instance.winner = data.winner;
     instance.result = data.result;
-    instance.moveLog = data.moveLog;
+    instance.moves = data.moves;
     return instance;
-  }
-
-  private checkWin(symbol: 'X' | 'O'): boolean {
-    return WINNING_LINES.some(([a, b, c]) =>
-      this.board[a] === symbol && this.board[b] === symbol && this.board[c] === symbol
-    );
-  }
-
-  private isValidPlacePayload(payload: unknown): payload is { position: number } {
-    if (typeof payload !== 'object' || payload === null) return false;
-    const p = payload as Record<string, unknown>;
-    return typeof p.position === 'number' && Number.isInteger(p.position) && p.position >= 0 && p.position <= 8;
   }
 }

@@ -31,6 +31,6 @@ export type CardGameState = {
 export type GameState = TicTacToeState | CardGameState;
 
 export type GameAction =
-  | { type: 'tictactoe:place'; position: number }
+  | { type: 'tictactoe:play'; index: number }
   | { type: 'cardgame:play'; card: Card }
   | { type: 'cardgame:draw' };

@@ -6,3 +6,4 @@ export const MAX_PLAYERS: Record<string, number> = {
   tictactoe: 2,
   cardgame: 4,
 };
+export const DISCONNECT_GRACE_MS = 30_000;

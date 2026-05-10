@@ -22,7 +22,7 @@ const persistGame = async (roomCode: string, gameType: GameType, game: BaseGame<
   await redis.set(gameInstanceKey(roomCode), payload, 'EX', GAME_TTL_SECONDS);
 };
 
-const loadGame = async (roomCode: string): Promise<{ game: BaseGame<GameState>; gameType: GameType } | null> => {
+export const loadGame = async (roomCode: string): Promise<{ game: BaseGame<GameState>; gameType: GameType } | null> => {
   const raw = await redis.get(gameInstanceKey(roomCode));
   if (!raw) return null;
 

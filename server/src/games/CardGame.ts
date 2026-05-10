@@ -9,29 +9,34 @@ type MoveEntry = { userId: string; card: Card; trickNumber: number; t: number };
 const SUITS: readonly Suit[] = ['♠', '♥', '♦', '♣'];
 const RANKS: readonly Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const SUIT_ORDER: Record<Suit, number> = { '♠': 0, '♥': 1, '♦': 2, '♣': 3 };
-const RANK_ORDER: Record<Rank, number> = {
+const RANK_ORDER_MAP: Record<Rank, number> = {
   '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
   'J': 11, 'Q': 12, 'K': 13, 'A': 14,
 };
 
 /** Sorts a hand by suit (♠♥♦♣) then rank ascending for stable display. */
 const sortHand = (hand: Card[]): Card[] =>
-  hand.sort((a, b) => SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || RANK_ORDER[a.rank] - RANK_ORDER[b.rank]);
+  hand.sort((a, b) => SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || RANK_ORDER_MAP[a.rank] - RANK_ORDER_MAP[b.rank]);
 
 type PlayerData = {
   userId: string;
   displayName: string;
   position: 0 | 1 | 2 | 3;
   hand: Card[];
-  tricksWon: number;
 };
 
 export class CardGame extends BaseGame<CardGameState> {
+  private static readonly RANK_ORDER: Record<Rank, number> = {
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14,
+  };
+
   private players: PlayerData[];
   private currentTurnIndex: 0 | 1 | 2 | 3;
   private currentTrick: { userId: string; card: Card }[];
   private leadSuit: Suit | null;
   private trickNumber: number;
+  private tricksWon: Record<string, number>;
   private winner: string | null = null;
   private result: 'win' | 'draw' | null = null;
   private moves: MoveEntry[] = [];
@@ -55,8 +60,9 @@ export class CardGame extends BaseGame<CardGameState> {
       displayName: p.displayName,
       position: i as 0 | 1 | 2 | 3,
       hand: sortHand(shuffled.slice(i * 13, i * 13 + 13)),
-      tricksWon: 0,
     }));
+
+    this.tricksWon = Object.fromEntries(this.players.map((p) => [p.userId, 0]));
 
     const startingIndex = this.players.findIndex((p) =>
       p.hand.some((c) => c.suit === '♣' && c.rank === '2'),
@@ -79,9 +85,9 @@ export class CardGame extends BaseGame<CardGameState> {
         displayName: p.displayName,
         position: p.position,
         handCount: p.hand.length,
-        tricksWon: p.tricksWon,
+        tricksWon: this.tricksWon[p.userId] ?? 0,
       })),
-      myHand: me ? [...me.hand] : undefined,
+      ...(me && { myHand: [...me.hand] }),
       currentTrick: this.currentTrick.map((c) => ({ userId: c.userId, card: c.card })),
       leadSuit: this.leadSuit,
       currentTurnUserId: this.players[this.currentTurnIndex]!.userId,
@@ -106,30 +112,31 @@ export class CardGame extends BaseGame<CardGameState> {
       throw new Error('UNKNOWN_ACTION');
     }
 
-    if (!this.isValidPlayPayload(payload)) {
+    if (!this.#isValidPlayPayload(payload)) {
       throw new Error('INVALID_PAYLOAD');
     }
 
-    if (userId !== this.players[this.currentTurnIndex].userId) {
+    const currentPlayer = this.players[this.currentTurnIndex]!;
+
+    if (userId !== currentPlayer.userId) {
       throw new Error('NOT_YOUR_TURN');
     }
 
     const { card } = payload;
-    const player = this.players[this.currentTurnIndex];
-    const cardIndex = player.hand.findIndex((c) => c.suit === card.suit && c.rank === card.rank);
+    const cardIndex = currentPlayer.hand.findIndex((c) => c.suit === card.suit && c.rank === card.rank);
 
     if (cardIndex === -1) {
       throw new Error('INVALID_CARD');
     }
 
     if (this.currentTrick.length > 0 && this.leadSuit !== null) {
-      const hasLeadSuit = player.hand.some((c) => c.suit === this.leadSuit);
+      const hasLeadSuit = currentPlayer.hand.some((c) => c.suit === this.leadSuit);
       if (hasLeadSuit && card.suit !== this.leadSuit) {
         throw new Error('MUST_FOLLOW_SUIT');
       }
     }
 
-    player.hand.splice(cardIndex, 1);
+    currentPlayer.hand.splice(cardIndex, 1);
     this.currentTrick.push({ userId, card });
 
     if (this.currentTrick.length === 1) {
@@ -139,11 +146,12 @@ export class CardGame extends BaseGame<CardGameState> {
     this.moves.push({ userId, card, trickNumber: this.trickNumber, t: Date.now() });
 
     if (this.currentTrick.length === 4) {
-      return this.resolveTrick();
+      this.#resolveTrick();
+      return { stateChanged: true, gameOver: this.result !== null };
     }
 
     this.currentTurnIndex = ((this.currentTurnIndex + 1) % 4) as 0 | 1 | 2 | 3;
-    return { stateChanged: true, gameOver: this.result !== null };
+    return { stateChanged: true, gameOver: false };
   }
 
   /* ─── Helpers ──────────────────────────────────────────────── */
@@ -157,10 +165,9 @@ export class CardGame extends BaseGame<CardGameState> {
   }
 
   getResult(): { result: 'win' | 'draw'; winnerId?: string } | null {
-    if (!this.result) return null;
-    return this.result === 'win'
-      ? { result: 'win', winnerId: this.winner! }
-      : { result: 'draw' };
+    if (this.result === null) return null;
+    if (this.winner) return { result: this.result, winnerId: this.winner };
+    return { result: this.result };
   }
 
   getMoveLog(): MoveEntry[] {
@@ -172,91 +179,107 @@ export class CardGame extends BaseGame<CardGameState> {
   serialize(): unknown {
     return {
       players: this.players,
-      currentTurnIndex: this.currentTurnIndex,
       currentTrick: this.currentTrick,
       leadSuit: this.leadSuit,
+      currentTurnIndex: this.currentTurnIndex,
+      tricksWon: this.tricksWon,
       trickNumber: this.trickNumber,
-      winner: this.winner,
       result: this.result,
+      winner: this.winner,
       moves: this.moves,
     };
   }
 
   static override deserialize(raw: unknown): CardGame {
-    const data = raw as {
+    if (typeof raw !== 'object' || raw === null) {
+      throw new Error('Invalid CardGame state: expected object');
+    }
+
+    const data = raw as Record<string, unknown>;
+
+    if (!Array.isArray(data.players) || data.players.length !== 4) {
+      throw new Error('Invalid CardGame state: players must be array of 4');
+    }
+    if (!Array.isArray(data.currentTrick)) {
+      throw new Error('Invalid CardGame state: currentTrick must be array');
+    }
+    if (typeof data.currentTurnIndex !== 'number') {
+      throw new Error('Invalid CardGame state: currentTurnIndex must be number');
+    }
+    if (typeof data.trickNumber !== 'number') {
+      throw new Error('Invalid CardGame state: trickNumber must be number');
+    }
+    if (typeof data.tricksWon !== 'object' || data.tricksWon === null) {
+      throw new Error('Invalid CardGame state: tricksWon must be object');
+    }
+    if (!Array.isArray(data.moves)) {
+      throw new Error('Invalid CardGame state: moves must be array');
+    }
+
+    const validated = data as {
       players: PlayerData[];
       currentTurnIndex: 0 | 1 | 2 | 3;
       currentTrick: { userId: string; card: Card }[];
       leadSuit: Suit | null;
       trickNumber: number;
+      tricksWon: Record<string, number>;
       winner: string | null;
       result: 'win' | 'draw' | null;
       moves: MoveEntry[];
     };
 
     const instance = Object.create(CardGame.prototype) as CardGame;
-    instance.players = data.players;
-    instance.currentTurnIndex = data.currentTurnIndex;
-    instance.currentTrick = data.currentTrick;
-    instance.leadSuit = data.leadSuit;
-    instance.trickNumber = data.trickNumber;
-    instance.winner = data.winner;
-    instance.result = data.result;
-    instance.moves = data.moves;
+    instance.players = validated.players.map((p) => ({
+      ...p,
+      hand: p.hand.map((c) => ({ suit: c.suit, rank: c.rank })),
+    }));
+    instance.currentTurnIndex = validated.currentTurnIndex;
+    instance.currentTrick = validated.currentTrick;
+    instance.leadSuit = validated.leadSuit;
+    instance.trickNumber = validated.trickNumber;
+    instance.tricksWon = validated.tricksWon;
+    instance.winner = validated.winner;
+    instance.result = validated.result;
+    instance.moves = validated.moves;
     return instance;
   }
 
-  /* ─── Trick Resolution ─────────────────────────────────────── */
+  /* ─── Trick Resolution (JS private fields) ──────────────────── */
 
-  private resolveTrick(): ActionResult {
-    const trickWinner = this.determineTrickWinner();
-    const winnerIndex = this.players.findIndex((p) => p.userId === trickWinner);
-    this.players[winnerIndex]!.tricksWon++;
+  #resolveTrick(): void {
+    const lead = this.leadSuit!;
+    const followingLeadSuit = this.currentTrick.filter((c) => c.card.suit === lead);
+    const winningEntry = followingLeadSuit.reduce((best, cur) =>
+      CardGame.RANK_ORDER[cur.card.rank] > CardGame.RANK_ORDER[best.card.rank] ? cur : best,
+    );
+
+    this.tricksWon[winningEntry.userId] = (this.tricksWon[winningEntry.userId] ?? 0) + 1;
+    this.currentTurnIndex = this.players.findIndex((p) => p.userId === winningEntry.userId) as 0 | 1 | 2 | 3;
 
     this.currentTrick = [];
     this.leadSuit = null;
-    this.currentTurnIndex = winnerIndex as 0 | 1 | 2 | 3;
+    this.trickNumber += 1;
 
-    const allHandsEmpty = this.players.every((p) => p.hand.length === 0);
-    if (allHandsEmpty) {
-      return this.determineGameResult();
-    }
-
-    this.trickNumber++;
-    return { stateChanged: true, gameOver: false };
+    if (this.trickNumber >= 13) this.#finalize();
   }
 
-  private determineTrickWinner(): string {
-    const leadSuit = this.leadSuit!;
-    const leadSuitCards = this.currentTrick.filter((entry) => entry.card.suit === leadSuit);
+  #finalize(): void {
+    const entries = Object.entries(this.tricksWon);
+    const maxTricks = Math.max(...entries.map(([, v]) => v));
+    const topPlayers = entries.filter(([, v]) => v === maxTricks);
 
-    let best = leadSuitCards[0]!;
-    for (const entry of leadSuitCards) {
-      if (RANK_ORDER[entry.card.rank] > RANK_ORDER[best.card.rank]) {
-        best = entry;
-      }
-    }
-
-    return best.userId;
-  }
-
-  private determineGameResult(): ActionResult {
-    const maxTricks = Math.max(...this.players.map((p) => p.tricksWon));
-    const winners = this.players.filter((p) => p.tricksWon === maxTricks);
-
-    if (winners.length === 1) {
-      this.winner = winners[0]!.userId;
+    if (topPlayers.length === 1) {
       this.result = 'win';
-      return { stateChanged: true, gameOver: true, result: 'win', winnerId: this.winner };
+      this.winner = topPlayers[0]![0];
+    } else {
+      this.result = 'draw';
+      this.winner = null;
     }
-
-    this.result = 'draw';
-    return { stateChanged: true, gameOver: true, result: 'draw' };
   }
 
   /* ─── Validation ───────────────────────────────────────────── */
 
-  private isValidPlayPayload(payload: unknown): payload is { card: Card } {
+  #isValidPlayPayload(payload: unknown): payload is { card: Card } {
     if (typeof payload !== 'object' || payload === null) return false;
     const p = payload as Record<string, unknown>;
     if (typeof p.card !== 'object' || p.card === null) return false;

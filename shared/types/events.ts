@@ -41,7 +41,15 @@ export interface ServerToClientEvents {
 
   "game:started": (data: { roomCode: string; gameState: GameState }) => void;
   "game:state-updated": (data: { roomCode: string; gameState: GameState }) => void;
-  "game:ended": (data: { roomCode: string; result: 'win' | 'draw'; winnerId: string | null; reason: string }) => void;
+  "game:turn": (data: { roomCode: string; currentPlayerId: string }) => void;
+  "game:ended": (data: {
+    roomCode: string;
+    result: 'win' | 'draw' | 'aborted';
+    winnerId: string | null;
+    winnerDisplayName: string | null;
+    matchId: string | null;
+    reason: string;
+  }) => void;
   "game:rematch-requested": (data: { userId: string; votes: string[] }) => void;
   "game:rematch-accepted": (data: { userId: string; votes: string[] }) => void;
   "game:rematch-declined": (data: { userId: string }) => void;

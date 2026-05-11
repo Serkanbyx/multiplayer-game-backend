@@ -74,7 +74,7 @@ app.use(errorHandler);
 const httpServer = http.createServer(app);
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(httpServer, {
-  cors: { origin: env.CLIENT_ORIGIN, credentials: true },
+  cors: corsOptions,
   pingTimeout: 20_000,
   pingInterval: 25_000,
   maxHttpBufferSize: 1e5,

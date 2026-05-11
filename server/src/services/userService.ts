@@ -3,6 +3,7 @@ import { eq, or, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import {
   users,
+  matches,
   usersPublicSelect,
   type UserRow,
   type PublicUserRow,
@@ -163,7 +164,31 @@ export const replacePreferences = async (
   return row.preferences;
 };
 
+/**
+ * Deletes a user and nullifies their references in match history.
+ * Match player snapshots preserve `displayName` for historical records.
+ */
 export const deleteUserById = async (userId: string): Promise<void> => {
+  await db
+    .update(matches)
+    .set({ winnerUserId: null })
+    .where(eq(matches.winnerUserId, userId));
+
+  await db.execute(sql`
+    UPDATE matches
+    SET players = (
+      SELECT jsonb_agg(
+        CASE
+          WHEN elem->>'userId' = ${userId}
+          THEN jsonb_set(elem, '{userId}', 'null'::jsonb)
+          ELSE elem
+        END
+      )
+      FROM jsonb_array_elements(players) AS elem
+    )
+    WHERE players @> ${JSON.stringify([{ userId }])}::jsonb
+  `);
+
   await db.delete(users).where(eq(users.id, userId));
 };
 

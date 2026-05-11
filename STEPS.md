@@ -1981,43 +1981,43 @@ export const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => E
 
 ## STEP 27 — Comprehensive Security Audit Checklist
 
-- [ ] Mass assignment: every controller (auth `register`, `updateProfile`, admin `updateUserRole`) destructures only allowed fields; no `req.body` spread into models.
-- [ ] Role protection: `role` is **not** settable via `register`, `updateProfile`, or any non-admin endpoint. Only `adminController.updateUserRole` can change it.
-- [ ] User enumeration: identical error message ("Invalid email or password") for wrong email vs. wrong password.
-- [ ] Password security: hashed with bcrypt (rounds 12), `select: false`, never returned in any response, change requires current password, deletion requires password confirmation.
-- [ ] JWT: secret length ≥ 32 chars enforced at startup in production. Tokens accepted only from `Authorization: Bearer` header (REST) or `socket.handshake.auth.token` (sockets). Guest tokens TTL ≤ 2 hours.
-- [ ] Rate limiters: separate instances for global, auth, admin, upload — wired in Step 2.
-- [ ] Helmet: enabled with default safe headers.
-- [ ] CORS: strict specific origin from `CLIENT_ORIGIN`; never `*` in production. Same origin enforced for Socket.io.
-- [ ] Body size limits: `express.json({ limit: '10kb' })` and `express.urlencoded({ limit: '10kb' })`. Socket.io `maxHttpBufferSize: 1e5`.
-- [ ] SQL injection: Drizzle + `postgres-js` parameterized queries used everywhere. **Zero** raw string interpolation of user input into `sql`` template literals — only `${variable}` (parameterized) is allowed.
-- [ ] Prototype-pollution: `sanitizeMiddleware` strips `__proto__`/`constructor`/`prototype` keys and clamps object depth.
-- [ ] Express 5 compatibility: no code assigns to `req.query`. `hpp` and `express-mongo-sanitize` are **not** installed.
-- [ ] XSS: `escape()` applied via express-validator on all user text (displayName, bio, chat, search queries).
-- [ ] ReDoS: `escapeRegex` used on every regex-based user search (admin search, public profile lookup).
-- [ ] Ownership checks: `room:leave`, `game:action`, `game:rematch_request` verify `socket.user._id` is a current player.
-- [ ] Spectator restrictions: spectators rejected on `game:action`/`game:rematch_request`; their `getStateFor(null)` view hides hidden info (card hands).
-- [ ] Admin self-protection: cannot delete self, cannot change own role, last-admin guarded.
-- [ ] Pagination clamp: `limit ≤ 100` (leaderboard), `≤ 50` (matches/users); page coerced to positive integer.
-- [ ] File upload: MIME whitelist (`image/jpeg`, `image/png`, `image/webp`), 5 MB cap, server-generated filenames.
-- [ ] Cascade rules: deleting a user nulls `Match.players.userId` but preserves displayName.
-- [ ] Error handler: never exposes stack traces or internal paths in production.
-- [ ] Privacy: `preferences.privacy.showStats` and `showOnLeaderboard` enforced server-side.
-- [ ] x-powered-by disabled.
-- [ ] `.env.example` synced with all required keys; no real secrets.
-- [ ] No `console.log` of tokens, hashes, or PII in production code.
-- [ ] Token storage: client uses `localStorage` only; never written to non-secure cookies.
-- [ ] Drizzle: schema is the single source of truth (no parallel `interface` drift). `password` column never selected by default — public reads use `usersPublicSelect` projection.
-- [ ] Migrations: every schema change has a generated `drizzle/NNNN_*.sql` file committed. Never hand-edit production-applied migrations.
-- [ ] Postgres error codes (`23505` unique violation, `23503` FK violation, `23502` not-null) are mapped to friendly generic messages in `errorHandler` — raw codes/columns never leak.
-- [ ] Connection pool capped (`max: 10` prod, `max: 5` dev) to stay under Neon free-tier limits.
-- [ ] TypeScript strict: `tsconfig.base.json` has `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`. No `any` anywhere except in third-party type shims.
-- [ ] Shared types: every wire-crossing payload (Socket.io events, REST responses, JWT claims) sourced from `shared/types/*.ts` — no duplicate type definitions on client and server.
-- [ ] Socket.io typed: `Server<ClientToServerEvents, ServerToClientEvents, ..., SocketData>` used on both server and client; payload typos caught at compile time.
-- [ ] Socket.io: every `io.on('connection')` is gated by `authSocket`; no unauthenticated connections allowed.
-- [ ] Game logic: all rules (turn, validity, winner detection, hand visibility) computed server-side; client `payload` shape validated before reaching the game class.
-- [ ] Room TTL: every `room:*` and `user:room:*` key created with `EX <ROOM_TTL_SECONDS>`; abandoned rooms self-clean.
-- [ ] Chat throttle: 500 ms per-user; chat history bounded at 50 messages.
+- [x] Mass assignment: every controller (auth `register`, `updateProfile`, admin `updateUserRole`) destructures only allowed fields; no `req.body` spread into models.
+- [x] Role protection: `role` is **not** settable via `register`, `updateProfile`, or any non-admin endpoint. Only `adminController.updateUserRole` can change it.
+- [x] User enumeration: identical error message ("Invalid email or password") for wrong email vs. wrong password.
+- [x] Password security: hashed with bcrypt (rounds 12), `select: false`, never returned in any response, change requires current password, deletion requires password confirmation.
+- [x] JWT: secret length ≥ 32 chars enforced at startup in production. Tokens accepted only from `Authorization: Bearer` header (REST) or `socket.handshake.auth.token` (sockets). Guest tokens TTL ≤ 2 hours.
+- [x] Rate limiters: separate instances for global, auth, admin, upload — wired in Step 2.
+- [x] Helmet: enabled with default safe headers.
+- [x] CORS: strict specific origin from `CLIENT_ORIGIN`; never `*` in production. Same origin enforced for Socket.io.
+- [x] Body size limits: `express.json({ limit: '10kb' })` and `express.urlencoded({ limit: '10kb' })`. Socket.io `maxHttpBufferSize: 1e5`.
+- [x] SQL injection: Drizzle + `postgres-js` parameterized queries used everywhere. **Zero** raw string interpolation of user input into `sql`` template literals — only `${variable}` (parameterized) is allowed.
+- [x] Prototype-pollution: `sanitizeMiddleware` strips `__proto__`/`constructor`/`prototype` keys and clamps object depth.
+- [x] Express 5 compatibility: no code assigns to `req.query`. `hpp` and `express-mongo-sanitize` are **not** installed.
+- [x] XSS: `escape()` applied via express-validator on all user text (displayName, bio, chat, search queries).
+- [x] ReDoS: `escapeRegex` used on every regex-based user search (admin search, public profile lookup).
+- [x] Ownership checks: `room:leave`, `game:action`, `game:rematch_request` verify `socket.user._id` is a current player.
+- [x] Spectator restrictions: spectators rejected on `game:action`/`game:rematch_request`; their `getStateFor(null)` view hides hidden info (card hands).
+- [x] Admin self-protection: cannot delete self, cannot change own role, last-admin guarded.
+- [x] Pagination clamp: `limit ≤ 100` (leaderboard), `≤ 50` (matches/users); page coerced to positive integer.
+- [x] File upload: MIME whitelist (`image/jpeg`, `image/png`, `image/webp`), 5 MB cap, server-generated filenames.
+- [x] Cascade rules: deleting a user nulls `Match.players.userId` but preserves displayName.
+- [x] Error handler: never exposes stack traces or internal paths in production.
+- [x] Privacy: `preferences.privacy.showStats` and `showOnLeaderboard` enforced server-side.
+- [x] x-powered-by disabled.
+- [x] `.env.example` synced with all required keys; no real secrets.
+- [x] No `console.log` of tokens, hashes, or PII in production code.
+- [x] Token storage: client uses `localStorage` only; never written to non-secure cookies.
+- [x] Drizzle: schema is the single source of truth (no parallel `interface` drift). `password` column never selected by default — public reads use `usersPublicSelect` projection.
+- [x] Migrations: every schema change has a generated `drizzle/NNNN_*.sql` file committed. Never hand-edit production-applied migrations.
+- [x] Postgres error codes (`23505` unique violation, `23503` FK violation, `23502` not-null) are mapped to friendly generic messages in `errorHandler` — raw codes/columns never leak.
+- [x] Connection pool capped (`max: 10` prod, `max: 5` dev) to stay under Neon free-tier limits.
+- [x] TypeScript strict: `tsconfig.base.json` has `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`. No `any` anywhere except in third-party type shims.
+- [x] Shared types: every wire-crossing payload (Socket.io events, REST responses, JWT claims) sourced from `shared/types/*.ts` — no duplicate type definitions on client and server.
+- [x] Socket.io typed: `Server<ClientToServerEvents, ServerToClientEvents, ..., SocketData>` used on both server and client; payload typos caught at compile time.
+- [x] Socket.io: every `io.on('connection')` is gated by `authSocket`; no unauthenticated connections allowed.
+- [x] Game logic: all rules (turn, validity, winner detection, hand visibility) computed server-side; client `payload` shape validated before reaching the game class.
+- [x] Room TTL: every `room:*` and `user:room:*` key created with `EX <ROOM_TTL_SECONDS>`; abandoned rooms self-clean.
+- [x] Chat throttle: 500 ms per-user; chat history bounded at 50 messages.
 
 ---
 

@@ -40,7 +40,7 @@ export const getLeaderboard = async (
     const notGuestFilter = eq(users.isGuest, false);
 
     const orderBy = gameType
-      ? sql`(${users.statsByGame}->'${sql.raw(gameType)}'->>'wins')::int DESC NULLS LAST`
+      ? sql`(${users.statsByGame}->${gameType}->>'wins')::int DESC NULLS LAST`
       : sql`(${users.stats}->>'wins')::int DESC`;
 
     const whereClause = and(notGuestFilter, privacyFilter);

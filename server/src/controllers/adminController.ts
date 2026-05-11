@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { eq, desc, sql, and, or, ilike, count as drizzleCount } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { users, usersPublicSelect, matches } from '../db/schema/index.js';
+import { deleteUserById } from '../services/userService.js';
 import { redis } from '../config/redis.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
 import { escapeLike } from '../utils/escapeRegex.js';
@@ -272,27 +273,7 @@ export const deleteUser = async (
       }
     }
 
-    await db
-      .update(matches)
-      .set({ winnerUserId: null })
-      .where(eq(matches.winnerUserId, targetId));
-
-    await db.execute(sql`
-      UPDATE matches
-      SET players = (
-        SELECT jsonb_agg(
-          CASE
-            WHEN elem->>'userId' = ${targetId}
-            THEN jsonb_set(elem, '{userId}', 'null'::jsonb)
-            ELSE elem
-          END
-        )
-        FROM jsonb_array_elements(players) AS elem
-      )
-      WHERE players @> ${JSON.stringify([{ userId: targetId }])}::jsonb
-    `);
-
-    await db.delete(users).where(eq(users.id, targetId));
+    await deleteUserById(targetId);
 
     sendSuccess(res, null, 'User deleted');
   } catch (err) {

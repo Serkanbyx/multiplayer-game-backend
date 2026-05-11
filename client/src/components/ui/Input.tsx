@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn';
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
-  error?: string;
+  error?: string | undefined;
   hint?: string;
   leftSlot?: ReactNode;
   rightSlot?: ReactNode;

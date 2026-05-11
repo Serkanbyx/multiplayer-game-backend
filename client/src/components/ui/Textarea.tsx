@@ -4,7 +4,7 @@ import { CharacterCounter } from './CharacterCounter';
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label?: string;
-  error?: string;
+  error?: string | undefined;
   hint?: string;
   showCounter?: boolean;
 };

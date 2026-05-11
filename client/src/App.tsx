@@ -26,6 +26,7 @@ import ProfileSettings from './pages/settings/ProfileSettings';
 import AccountSettings from './pages/settings/AccountSettings';
 import AppearanceSettings from './pages/settings/AppearanceSettings';
 import NotificationSettings from './pages/settings/NotificationSettings';
+import PrivacySettings from './pages/settings/PrivacySettings';
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <Route path="account" element={<AccountSettings />} />
             <Route path="appearance" element={<AppearanceSettings />} />
             <Route path="notifications" element={<NotificationSettings />} />
+            <Route path="privacy" element={<PrivacySettings />} />
           </Route>
         </Route>
 

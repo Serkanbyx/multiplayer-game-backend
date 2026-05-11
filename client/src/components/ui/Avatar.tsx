@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 type AvatarProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
-  src?: string | null;
+  src?: string | null | undefined;
   name: string;
   size?: AvatarSize;
 };

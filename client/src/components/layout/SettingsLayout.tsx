@@ -5,6 +5,7 @@ import {
   KeyRound,
   Palette,
   Bell,
+  Shield,
   ChevronDown,
   Settings,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ const settingsLinks = [
   { to: '/settings/account', label: 'Account', icon: KeyRound },
   { to: '/settings/appearance', label: 'Appearance', icon: Palette },
   { to: '/settings/notifications', label: 'Notifications', icon: Bell },
+  { to: '/settings/privacy', label: 'Privacy', icon: Shield },
 ] as const;
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>

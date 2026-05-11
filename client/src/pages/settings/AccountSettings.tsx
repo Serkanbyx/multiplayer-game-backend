@@ -1,0 +1,10 @@
+const AccountSettings = () => {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-fg">Account</h1>
+      <p className="mt-2 text-fg-muted">Account settings — implemented in Step 38.</p>
+    </div>
+  );
+};
+
+export default AccountSettings;

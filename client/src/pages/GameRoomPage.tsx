@@ -39,11 +39,14 @@ type GameEndResult = {
   winnerDisplayName: string | null;
 };
 
+/* ── Grace period for forfeit countdown (matches server Step 24) ── */
+const DISCONNECT_GRACE_SECONDS = 30;
+
 const GameRoomPage = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { emit, isConnected } = useSocket();
+  const { emit, isConnected, connectionState } = useSocket();
 
   /* ── Core state ── */
   const [room, setRoom] = useState<Room | null>(null);
@@ -56,6 +59,12 @@ const GameRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [throttledUntil, setThrottledUntil] = useState<number | null>(null);
 
+  /* ── Opponent disconnect countdown ── */
+  const [disconnectedOpponents, setDisconnectedOpponents] = useState<
+    Map<string, { displayName: string; secondsLeft: number }>
+  >(new Map());
+  const countdownIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
   const hasJoinedRef = useRef(false);
   const mySelfUserId = user?._id ?? '';
 
@@ -63,6 +72,58 @@ const GameRoomPage = () => {
   const iAmPlayer = room?.players.some((p) => p.userId === mySelfUserId) ?? false;
   const isMyTurn = currentTurnUserId === mySelfUserId;
   const statusConfig = STATUS_CONFIG[room?.status ?? ''] ?? STATUS_CONFIG.waiting;
+  const isPlaying = room?.status === 'playing';
+
+  /* ── Start/stop opponent disconnect countdown ── */
+  const startOpponentCountdown = useCallback((userId: string, displayName: string) => {
+    const existing = countdownIntervalsRef.current.get(userId);
+    if (existing) clearInterval(existing);
+
+    setDisconnectedOpponents((prev) => {
+      const next = new Map(prev);
+      next.set(userId, { displayName, secondsLeft: DISCONNECT_GRACE_SECONDS });
+      return next;
+    });
+
+    const interval = setInterval(() => {
+      setDisconnectedOpponents((prev) => {
+        const entry = prev.get(userId);
+        if (!entry || entry.secondsLeft <= 1) {
+          clearInterval(interval);
+          countdownIntervalsRef.current.delete(userId);
+          const next = new Map(prev);
+          next.delete(userId);
+          return next;
+        }
+        const next = new Map(prev);
+        next.set(userId, { ...entry, secondsLeft: entry.secondsLeft - 1 });
+        return next;
+      });
+    }, 1000);
+
+    countdownIntervalsRef.current.set(userId, interval);
+  }, []);
+
+  const stopOpponentCountdown = useCallback((userId: string) => {
+    const interval = countdownIntervalsRef.current.get(userId);
+    if (interval) {
+      clearInterval(interval);
+      countdownIntervalsRef.current.delete(userId);
+    }
+    setDisconnectedOpponents((prev) => {
+      const next = new Map(prev);
+      next.delete(userId);
+      return next;
+    });
+  }, []);
+
+  /* ── Cleanup countdown intervals on unmount ── */
+  useEffect(() => {
+    return () => {
+      countdownIntervalsRef.current.forEach((interval) => clearInterval(interval));
+      countdownIntervalsRef.current.clear();
+    };
+  }, []);
 
   /* ── Join room on mount ── */
   useEffect(() => {
@@ -97,14 +158,34 @@ const GameRoomPage = () => {
 
   /* ── Socket event handlers ── */
   const handleRoomUpdated = useCallback((updatedRoom: Room) => {
-    setRoom(updatedRoom);
+    setRoom((prev) => {
+      if (prev && isPlaying) {
+        updatedRoom.players.forEach((player) => {
+          const prevPlayer = prev.players.find((p) => p.userId === player.userId);
+          if (!prevPlayer) return;
+
+          if (player.userId === mySelfUserId) return;
+
+          if (!prevPlayer.isConnected && player.isConnected) {
+            toast.success(`${player.displayName} reconnected.`);
+            stopOpponentCountdown(player.userId);
+          }
+
+          if (prevPlayer.isConnected && !player.isConnected) {
+            startOpponentCountdown(player.userId, player.displayName);
+          }
+        });
+      }
+      return updatedRoom;
+    });
+
     setChat(updatedRoom.chat);
     setRematchVotes(updatedRoom.rematchVotes);
     if (updatedRoom.gameState) {
       setGameState(updatedRoom.gameState);
       setCurrentTurnUserId(updatedRoom.gameState.currentTurnUserId);
     }
-  }, []);
+  }, [isPlaying, mySelfUserId, stopOpponentCountdown, startOpponentCountdown]);
 
   const handlePlayerJoined = useCallback(
     (player: { userId: string; displayName: string; isGuest: boolean; avatarUrl: string | null; position: number; isConnected: boolean }) => {
@@ -121,6 +202,7 @@ const GameRoomPage = () => {
 
   const handlePlayerLeft = useCallback(
     (data: { playerId: string; newHostId?: string }) => {
+      stopOpponentCountdown(data.playerId);
       setRoom((prev) => {
         if (!prev) return prev;
         return {
@@ -130,7 +212,7 @@ const GameRoomPage = () => {
         };
       });
     },
-    [],
+    [stopOpponentCountdown],
   );
 
   const handleRoomClosed = useCallback(() => {
@@ -180,6 +262,10 @@ const GameRoomPage = () => {
       });
       setCurrentTurnUserId(null);
       setRoom((prev) => (prev ? { ...prev, status: 'finished' } : prev));
+
+      countdownIntervalsRef.current.forEach((interval) => clearInterval(interval));
+      countdownIntervalsRef.current.clear();
+      setDisconnectedOpponents(new Map());
     },
     [],
   );
@@ -222,6 +308,18 @@ const GameRoomPage = () => {
     (data: { userId: string; isOnline: boolean }) => {
       setRoom((prev) => {
         if (!prev) return prev;
+
+        const player = prev.players.find((p) => p.userId === data.userId);
+        if (player && data.userId !== mySelfUserId && isPlaying) {
+          if (!data.isOnline && player.isConnected) {
+            startOpponentCountdown(data.userId, player.displayName);
+          }
+          if (data.isOnline && !player.isConnected) {
+            toast.success(`${player.displayName} reconnected.`);
+            stopOpponentCountdown(data.userId);
+          }
+        }
+
         return {
           ...prev,
           players: prev.players.map((p) =>
@@ -230,7 +328,7 @@ const GameRoomPage = () => {
         };
       });
     },
-    [],
+    [mySelfUserId, isPlaying, startOpponentCountdown, stopOpponentCountdown],
   );
 
   const handleError = useCallback(
@@ -300,6 +398,10 @@ const GameRoomPage = () => {
       toast.error('Failed to copy room code.');
     }
   }, [roomCode]);
+
+  /* ── Self-disconnect: show overlay when in a game ── */
+  const showReconnectingOverlay =
+    !isConnected && isPlaying && gameState !== null;
 
   /* ── Loading state ── */
   if (isLoading) {
@@ -380,6 +482,7 @@ const GameRoomPage = () => {
             players={room.players}
             currentTurnUserId={currentTurnUserId}
             mySelfUserId={mySelfUserId}
+            disconnectedOpponents={disconnectedOpponents}
           />
           <SpectatorList spectators={room.spectators} />
         </aside>
@@ -394,7 +497,7 @@ const GameRoomPage = () => {
           />
 
           {gameState ? (
-            <div className="flex justify-center">
+            <div className="relative flex justify-center">
               <GameBoardFrame
                 gameType={room.gameType}
                 gameState={gameState}
@@ -402,6 +505,26 @@ const GameRoomPage = () => {
                 mySelfUserId={mySelfUserId}
                 onAction={handleGameAction}
               />
+
+              {/* ── Reconnecting overlay on game board ── */}
+              {showReconnectingOverlay && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-bg/70 backdrop-blur-sm">
+                  <div className="text-center space-y-3 px-6 py-4 rounded-xl bg-surface/90 border border-border shadow-lg">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="relative flex h-3 w-3">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning opacity-75" />
+                        <span className="relative inline-flex h-3 w-3 rounded-full bg-warning" />
+                      </span>
+                      <span className="text-lg font-semibold text-fg">
+                        Reconnecting…
+                      </span>
+                    </div>
+                    <p className="text-sm text-fg-muted">
+                      Your turn timer is paused server-side.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface/50 py-16 space-y-3">

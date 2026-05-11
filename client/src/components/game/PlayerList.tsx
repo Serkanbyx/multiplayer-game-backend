@@ -7,6 +7,7 @@ type PlayerListProps = {
   players: RoomPlayer[];
   currentTurnUserId: string | null;
   mySelfUserId: string;
+  disconnectedOpponents?: Map<string, { displayName: string; secondsLeft: number }>;
 };
 
 const PlayerCard = memo(
@@ -14,10 +15,12 @@ const PlayerCard = memo(
     player,
     isCurrentTurn,
     isSelf,
+    forfeitCountdown,
   }: {
     player: RoomPlayer;
     isCurrentTurn: boolean;
     isSelf: boolean;
+    forfeitCountdown: number | null;
   }) => (
     <div
       className={cn(
@@ -25,7 +28,7 @@ const PlayerCard = memo(
         isCurrentTurn
           ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
           : 'border-border bg-surface',
-        !player.isConnected && 'opacity-50',
+        !player.isConnected && 'opacity-50 grayscale',
       )}
     >
       <div className="relative">
@@ -52,7 +55,12 @@ const PlayerCard = memo(
             <span className="text-xs text-fg-muted">(you)</span>
           )}
         </div>
-        {!player.isConnected && (
+        {!player.isConnected && forfeitCountdown !== null && (
+          <span className="text-xs font-medium text-danger">
+            Forfeits in {forfeitCountdown}s…
+          </span>
+        )}
+        {!player.isConnected && forfeitCountdown === null && (
           <span className="text-xs text-warning">Reconnecting…</span>
         )}
       </div>
@@ -71,11 +79,22 @@ const arePlayerListPropsEqual = (prev: PlayerListProps, next: PlayerListProps): 
 
   const prevKey = prev.players.map((p) => p.userId + p.isConnected).join();
   const nextKey = next.players.map((p) => p.userId + p.isConnected).join();
-  return prevKey === nextKey;
+  if (prevKey !== nextKey) return false;
+
+  if (prev.disconnectedOpponents !== next.disconnectedOpponents) {
+    if (!prev.disconnectedOpponents || !next.disconnectedOpponents) return false;
+    if (prev.disconnectedOpponents.size !== next.disconnectedOpponents.size) return false;
+    for (const [key, val] of prev.disconnectedOpponents) {
+      const nextVal = next.disconnectedOpponents.get(key);
+      if (!nextVal || nextVal.secondsLeft !== val.secondsLeft) return false;
+    }
+  }
+
+  return true;
 };
 
 export const PlayerList = memo(
-  ({ players, currentTurnUserId, mySelfUserId }: PlayerListProps) => (
+  ({ players, currentTurnUserId, mySelfUserId, disconnectedOpponents }: PlayerListProps) => (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wider">
         Players
@@ -87,6 +106,9 @@ export const PlayerList = memo(
             player={player}
             isCurrentTurn={player.userId === currentTurnUserId}
             isSelf={player.userId === mySelfUserId}
+            forfeitCountdown={
+              disconnectedOpponents?.get(player.userId)?.secondsLeft ?? null
+            }
           />
         ))}
       </div>

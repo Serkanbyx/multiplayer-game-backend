@@ -54,6 +54,7 @@ const GameRoomPage = () => {
   const [rematchVotes, setRematchVotes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [throttledUntil, setThrottledUntil] = useState<number | null>(null);
 
   const hasJoinedRef = useRef(false);
   const mySelfUserId = user?._id ?? '';
@@ -234,6 +235,11 @@ const GameRoomPage = () => {
 
   const handleError = useCallback(
     (data: { message: string; code?: string }) => {
+      if (data.code === 'CHAT_THROTTLED') {
+        const cooldownMs = parseInt(data.message.match(/(\d+)/)?.[1] ?? '5', 10) * 1000;
+        setThrottledUntil(Date.now() + cooldownMs);
+        return;
+      }
       toast.error(data.message);
     },
     [],
@@ -415,6 +421,7 @@ const GameRoomPage = () => {
             messages={chat}
             onSend={handleSendChat}
             mySelfUserId={mySelfUserId}
+            throttledUntil={throttledUntil}
           />
         </aside>
       </div>

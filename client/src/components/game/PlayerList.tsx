@@ -64,20 +64,33 @@ const PlayerCard = memo(
   ),
 );
 
-export const PlayerList = memo(({ players, currentTurnUserId, mySelfUserId }: PlayerListProps) => (
-  <div className="space-y-2">
-    <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wider">
-      Players
-    </h3>
+const arePlayerListPropsEqual = (prev: PlayerListProps, next: PlayerListProps): boolean => {
+  if (prev.currentTurnUserId !== next.currentTurnUserId) return false;
+  if (prev.mySelfUserId !== next.mySelfUserId) return false;
+  if (prev.players.length !== next.players.length) return false;
+
+  const prevKey = prev.players.map((p) => p.userId + p.isConnected).join();
+  const nextKey = next.players.map((p) => p.userId + p.isConnected).join();
+  return prevKey === nextKey;
+};
+
+export const PlayerList = memo(
+  ({ players, currentTurnUserId, mySelfUserId }: PlayerListProps) => (
     <div className="space-y-2">
-      {players.map((player) => (
-        <PlayerCard
-          key={player.userId}
-          player={player}
-          isCurrentTurn={player.userId === currentTurnUserId}
-          isSelf={player.userId === mySelfUserId}
-        />
-      ))}
+      <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wider">
+        Players
+      </h3>
+      <div className="space-y-2">
+        {players.map((player) => (
+          <PlayerCard
+            key={player.userId}
+            player={player}
+            isCurrentTurn={player.userId === currentTurnUserId}
+            isSelf={player.userId === mySelfUserId}
+          />
+        ))}
+      </div>
     </div>
-  </div>
-));
+  ),
+  arePlayerListPropsEqual,
+);

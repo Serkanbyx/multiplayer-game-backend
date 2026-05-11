@@ -7,6 +7,7 @@ type ChatPanelProps = {
   messages: ChatMessage[];
   onSend: (text: string) => void;
   mySelfUserId: string;
+  throttledUntil: number | null;
 };
 
 const MAX_MESSAGE_LENGTH = 300;
@@ -44,10 +45,30 @@ const ChatMessageRow = memo(
   ),
 );
 
-export const ChatPanel = memo(({ messages, onSend, mySelfUserId }: ChatPanelProps) => {
+export const ChatPanel = memo(({ messages, onSend, mySelfUserId, throttledUntil }: ChatPanelProps) => {
   const [input, setInput] = useState('');
+  const [remainingMs, setRemainingMs] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAutoScrollRef = useRef(true);
+
+  /* Throttle countdown timer */
+  useEffect(() => {
+    if (!throttledUntil) {
+      setRemainingMs(0);
+      return;
+    }
+
+    const tick = () => {
+      const left = throttledUntil - Date.now();
+      setRemainingMs(left > 0 ? left : 0);
+    };
+
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [throttledUntil]);
+
+  const isThrottled = remainingMs > 0;
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -62,6 +83,7 @@ export const ChatPanel = memo(({ messages, onSend, mySelfUserId }: ChatPanelProp
   }, [messages.length]);
 
   const handleSubmit = () => {
+    if (isThrottled) return;
     const trimmed = input.trim();
     if (!trimmed || trimmed.length > MAX_MESSAGE_LENGTH) return;
     onSend(trimmed);
@@ -69,7 +91,11 @@ export const ChatPanel = memo(({ messages, onSend, mySelfUserId }: ChatPanelProp
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleSubmit();
     }
@@ -103,19 +129,25 @@ export const ChatPanel = memo(({ messages, onSend, mySelfUserId }: ChatPanelProp
       </div>
 
       <div className="shrink-0 border-t border-border px-3 py-2.5">
+        {isThrottled && (
+          <p className="mb-1.5 text-center text-xs font-medium text-warning">
+            Please wait {Math.ceil(remainingMs / 1000)}s…
+          </p>
+        )}
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message…"
+            placeholder={isThrottled ? 'Slow down…' : 'Type a message…'}
             maxLength={MAX_MESSAGE_LENGTH}
-            className="flex-1 rounded-md border border-border bg-bg px-3 py-1.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-primary"
+            disabled={isThrottled}
+            className="flex-1 rounded-md border border-border bg-bg px-3 py-1.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           />
           <button
             onClick={handleSubmit}
-            disabled={!input.trim() || input.trim().length > MAX_MESSAGE_LENGTH}
+            disabled={isThrottled || !input.trim() || input.trim().length > MAX_MESSAGE_LENGTH}
             className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Send

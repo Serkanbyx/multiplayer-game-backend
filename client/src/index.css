@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+@theme {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-primary: #6366f1;
+  --color-accent: #f59e0b;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+}
+
+@media (prefers-color-scheme: light) {
+  :root { color-scheme: light; }
+}
+
+.font-size-small  { font-size: 14px; }
+.font-size-medium { font-size: 16px; }
+.font-size-large  { font-size: 18px; }

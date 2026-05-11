@@ -1,7 +1,7 @@
 import { memo } from 'react';
-import type { GameType, GameState, GameAction, CardGameState } from '@mpg/shared/types/games';
+import type { GameType, GameState, GameAction, Card } from '@mpg/shared/types/games';
 import { TicTacToeBoard } from '../games/TicTacToeBoard';
-import { cn } from '../../utils/cn';
+import { CardGameTable } from '../games/CardGameTable';
 
 type GameBoardFrameProps = {
   gameType: GameType;
@@ -31,13 +31,20 @@ export const GameBoardFrame = memo(
           />
         );
       }
-      case 'cardgame':
+      case 'cardgame': {
+        const handlePlayCard = (card: Card) => {
+          onAction({ type: 'cardgame:play_card', card });
+        };
+
         return (
-          <CardGamePlaceholder
-            gameState={gameState}
+          <CardGameTable
+            {...gameState}
             isMyTurn={isMyTurn}
+            mySelfUserId={mySelfUserId}
+            onPlayCard={handlePlayCard}
           />
         );
+      }
       default: {
         const _exhaustive: never = gameState;
         return <div>Unknown game type: {(gameType as string)}</div>;
@@ -46,22 +53,3 @@ export const GameBoardFrame = memo(
   },
 );
 
-/* ── Temporary placeholder until Step 40 ── */
-
-const CardGamePlaceholder = ({
-  gameState,
-  isMyTurn,
-}: {
-  gameState: CardGameState;
-  isMyTurn: boolean;
-}) => (
-  <div className="flex flex-col items-center gap-4 rounded-lg border border-border bg-surface p-8">
-    <p className="text-lg font-semibold text-fg">Card Game</p>
-    <p className="text-sm text-fg-muted">
-      Trick #{gameState.trickNumber} — {isMyTurn ? 'Your turn' : 'Waiting…'}
-    </p>
-    <p className="text-xs text-fg-muted">
-      Full card game UI will be implemented in Step 40.
-    </p>
-  </div>
-);

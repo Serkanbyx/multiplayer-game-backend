@@ -1,28 +1,4 @@
 import { body, type ValidationChain } from 'express-validator';
-import type { Request, Response, NextFunction } from 'express';
-import { validationResult } from 'express-validator';
-import { sendError } from '../utils/apiResponse.js';
-
-/* ------------------------------------------------------------------ */
-/*  General validate middleware                                         */
-/* ------------------------------------------------------------------ */
-
-export const validate = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formatted = errors.array().map((e) => ({
-      field: 'path' in e ? (e.path as string) : 'unknown',
-      message: e.msg as string,
-    }));
-    sendError(res, 'Validation failed', 400, formatted);
-    return;
-  }
-  next();
-};
 
 /* ------------------------------------------------------------------ */
 /*  Register                                                           */
@@ -42,9 +18,12 @@ export const registerValidator: ValidationChain[] = [
     .normalizeEmail(),
   body('password')
     .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters'),
+    .withMessage('Password must be at least 8 characters')
+    .matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter and one number'),
   body('displayName')
     .trim()
+    .escape()
     .isLength({ min: 2, max: 30 })
     .withMessage('Display name must be 2–30 characters'),
 ];
@@ -72,11 +51,13 @@ export const updateProfileValidator: ValidationChain[] = [
   body('displayName')
     .optional()
     .trim()
+    .escape()
     .isLength({ min: 2, max: 30 })
     .withMessage('Display name must be 2–30 characters'),
   body('bio')
     .optional()
     .trim()
+    .escape()
     .isLength({ max: 200 })
     .withMessage('Bio must be at most 200 characters'),
   body('avatarUrl')

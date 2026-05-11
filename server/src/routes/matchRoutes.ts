@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getRecentMatches, getMatchById } from '../controllers/matchController.js';
 import { optionalAuth } from '../middleware/authMiddleware.js';
-import { validate } from '../validators/authValidators.js';
+import { validate } from '../middleware/validate.js';
 import { paginationValidator } from '../validators/userValidators.js';
 import {
   uuidParamValidator,

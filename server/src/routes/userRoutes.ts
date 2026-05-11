@@ -11,7 +11,7 @@ import {
 import { protect, optionalAuth, registeredOnly } from '../middleware/authMiddleware.js';
 import { uploadLimiter } from '../middleware/rateLimiters.js';
 import { uploadAvatar } from '../middleware/uploadMiddleware.js';
-import { validate } from '../validators/authValidators.js';
+import { validate } from '../middleware/validate.js';
 import {
   usernameParamValidator,
   paginationValidator,

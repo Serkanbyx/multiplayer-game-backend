@@ -1,4 +1,5 @@
 import { body, param, query, type ValidationChain } from 'express-validator';
+import { escapeRegex } from '../utils/escapeRegex.js';
 
 /* ------------------------------------------------------------------ */
 /*  Pagination + search for GET /api/admin/users                       */
@@ -18,8 +19,10 @@ export const adminUsersQueryValidator: ValidationChain[] = [
   query('search')
     .optional()
     .trim()
+    .escape()
     .isLength({ max: 100 })
-    .withMessage('Search query must be at most 100 characters'),
+    .withMessage('Search query must be at most 100 characters')
+    .customSanitizer((value) => escapeRegex(value)),
   query('role')
     .optional()
     .isIn(['player', 'admin'])
@@ -27,14 +30,30 @@ export const adminUsersQueryValidator: ValidationChain[] = [
 ];
 
 /* ------------------------------------------------------------------ */
+/*  User search (escape + regex-escape via customSanitizer)            */
+/* ------------------------------------------------------------------ */
+
+export const userSearchValidator: ValidationChain[] = [
+  query('search')
+    .optional()
+    .trim()
+    .escape()
+    .isLength({ max: 100 })
+    .withMessage('Search query must be at most 100 characters')
+    .customSanitizer((value) => escapeRegex(value)),
+];
+
+/* ------------------------------------------------------------------ */
 /*  :id param — UUID format                                            */
 /* ------------------------------------------------------------------ */
 
-export const adminUserIdValidator: ValidationChain[] = [
+export const userIdParamValidator: ValidationChain[] = [
   param('id')
     .isUUID(4)
     .withMessage('User ID must be a valid UUID'),
 ];
+
+export const adminUserIdValidator = userIdParamValidator;
 
 /* ------------------------------------------------------------------ */
 /*  PATCH /api/admin/users/:id/role — update role                      */

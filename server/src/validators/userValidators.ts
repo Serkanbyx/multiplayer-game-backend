@@ -38,11 +38,13 @@ export const updateProfileValidator: ValidationChain[] = [
   body('displayName')
     .optional()
     .trim()
+    .escape()
     .isLength({ min: 2, max: 30 })
     .withMessage('Display name must be 2–30 characters'),
   body('bio')
     .optional()
     .trim()
+    .escape()
     .isLength({ max: 200 })
     .withMessage('Bio must be at most 200 characters'),
 ];

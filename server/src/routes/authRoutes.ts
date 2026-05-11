@@ -17,8 +17,8 @@ import {
   updateProfileValidator,
   changePasswordValidator,
   deleteAccountValidator,
-  validate,
 } from '../validators/authValidators.js';
+import { validate } from '../middleware/validate.js';
 
 const router = Router();
 

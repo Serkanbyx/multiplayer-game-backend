@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { protect, registeredOnly, adminOnly } from '../middleware/authMiddleware.js';
 import { adminLimiter } from '../middleware/rateLimiters.js';
-import { validate } from '../validators/authValidators.js';
+import { validate } from '../middleware/validate.js';
 import {
   adminUsersQueryValidator,
   adminUserIdValidator,

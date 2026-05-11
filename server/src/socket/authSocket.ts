@@ -4,6 +4,7 @@ import type { JwtPayload } from '@mpg/shared/types/auth.js';
 import { env } from '../config/env.js';
 import { db } from '../db/index.js';
 import { users } from '../db/schema/index.js';
+import { childLogger } from '../utils/logger.js';
 import type { TypedSocket } from './index.js';
 
 /**
@@ -59,6 +60,7 @@ export const authSocket = async (
       };
     }
 
+    socket.data.logger = childLogger({ socketId: socket.id, userId: socket.data.user._id });
     socket.join(`user:${socket.data.user._id}`);
     next();
   } catch {

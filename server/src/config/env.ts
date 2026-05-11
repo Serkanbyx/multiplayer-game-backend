@@ -2,6 +2,8 @@ import 'dotenv/config';
 
 type NodeEnv = 'development' | 'production' | 'test';
 
+type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
 interface Env {
   NODE_ENV: NodeEnv;
   PORT: number;
@@ -15,6 +17,7 @@ interface Env {
   MATCHMAKING_TTL_SECONDS: number;
   BCRYPT_SALT_ROUNDS: number;
   UPLOAD_MAX_BYTES: number;
+  LOG_LEVEL: LogLevel;
 }
 
 const requiredString = (key: string): string => {
@@ -69,6 +72,16 @@ if (BCRYPT_SALT_ROUNDS < 10) {
   throw new Error('BCRYPT_SALT_ROUNDS must be at least 10');
 }
 
+const parseLogLevel = (): LogLevel => {
+  const defaultLevel: LogLevel = NODE_ENV === 'production' ? 'info' : 'debug';
+  const raw = optionalString('LOG_LEVEL', defaultLevel);
+  const allowed: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
+  if (!allowed.includes(raw as LogLevel)) {
+    throw new Error(`LOG_LEVEL must be one of: ${allowed.join(', ')}`);
+  }
+  return raw as LogLevel;
+};
+
 export const env: Env = {
   NODE_ENV,
   PORT: toPositiveInt('PORT', 5000),
@@ -82,4 +95,5 @@ export const env: Env = {
   MATCHMAKING_TTL_SECONDS: toInt('MATCHMAKING_TTL_SECONDS', 300),
   BCRYPT_SALT_ROUNDS,
   UPLOAD_MAX_BYTES: toInt('UPLOAD_MAX_BYTES', 5_242_880),
+  LOG_LEVEL: parseLogLevel(),
 };

@@ -1,4 +1,5 @@
 import type { Server, Socket } from 'socket.io';
+import type { Logger } from 'pino';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -11,19 +12,24 @@ import { registerChatHandlers } from './chatHandlers.js';
 import { registerGameHandlers, loadGame } from './gameHandlers.js';
 import { registerDisconnectHandlers, cancelGraceTimer } from './disconnectHandlers.js';
 import * as roomService from '../services/roomService.js';
+import { childLogger } from '../utils/logger.js';
+
+interface ServerSocketData extends SocketData {
+  logger: Logger;
+}
 
 export type TypedServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,
   Record<string, never>,
-  SocketData
+  ServerSocketData
 >;
 
 export type TypedSocket = Socket<
   ClientToServerEvents,
   ServerToClientEvents,
   Record<string, never>,
-  SocketData
+  ServerSocketData
 >;
 
 const socketRoomChannel = (roomCode: string) => `room:${roomCode}`;
@@ -35,6 +41,7 @@ const socketRoomChannel = (roomCode: string) => `room:${roomCode}`;
  */
 const handleReconnection = async (io: TypedServer, socket: TypedSocket): Promise<void> => {
   const { user } = socket.data;
+  const log = socket.data.logger;
   const roomCode = await roomService.getUserRoom(user._id);
   if (!roomCode) return;
 
@@ -74,7 +81,7 @@ const handleReconnection = async (io: TypedServer, socket: TypedSocket): Promise
       }
     }
 
-    console.log(`Reconnected player ${user.displayName} (${user._id}) to room ${roomCode}`);
+    log.info({ roomCode, role: 'player' }, 'Reconnected to room');
   } else {
     socket.emit('room:updated', room);
 
@@ -88,7 +95,7 @@ const handleReconnection = async (io: TypedServer, socket: TypedSocket): Promise
       }
     }
 
-    console.log(`Reconnected spectator ${user.displayName} (${user._id}) to room ${roomCode}`);
+    log.info({ roomCode, role: 'spectator' }, 'Reconnected to room');
   }
 };
 
@@ -97,7 +104,8 @@ export const registerSocketHandlers = (io: TypedServer): void => {
 
   io.on('connection', async (socket: TypedSocket) => {
     const { user } = socket.data;
-    console.log(`Socket connected: ${user.displayName} (${user._id})`);
+    socket.data.logger = childLogger({ socketId: socket.id, userId: user._id });
+    socket.data.logger.info({ displayName: user.displayName }, 'Socket connected');
 
     registerRoomHandlers(io, socket);
     registerMatchmakingHandlers(io, socket);
@@ -108,7 +116,7 @@ export const registerSocketHandlers = (io: TypedServer): void => {
     try {
       await handleReconnection(io, socket);
     } catch (err) {
-      console.error('Error during reconnection check:', err);
+      socket.data.logger.error({ err }, 'Error during reconnection check');
     }
   });
 };

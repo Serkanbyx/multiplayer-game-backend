@@ -3,6 +3,7 @@ import * as roomService from '../services/roomService.js';
 import * as matchmakingService from '../services/matchmakingService.js';
 import { handleAbortOnLeave } from './gameHandlers.js';
 import { DISCONNECT_GRACE_MS } from '../utils/constants.js';
+import { logger } from '../utils/logger.js';
 
 const socketRoomChannel = (roomCode: string) => `room:${roomCode}`;
 const graceTimerKey = (roomCode: string, userId: string) => `${roomCode}:${userId}`;
@@ -45,7 +46,7 @@ const startGraceTimer = (io: TypedServer, roomCode: string, userId: string): voi
       );
       if (!isStillDisconnected) return;
 
-      console.log(`Grace period expired for ${userId} in room ${roomCode}`);
+      logger.info({ userId, roomCode }, 'Grace period expired');
 
       if (room.status === 'playing') {
         await handleAbortOnLeave(io, roomCode, userId);
@@ -61,7 +62,7 @@ const startGraceTimer = (io: TypedServer, roomCode: string, userId: string): voi
         io.in(socketRoomChannel(roomCode)).emit('room:updated', updatedRoom);
       }
     } catch (err) {
-      console.error('Error during grace period expiry cleanup:', err);
+      logger.error({ err, roomCode, userId }, 'Error during grace period expiry cleanup');
     }
   }, DISCONNECT_GRACE_MS);
 
@@ -72,8 +73,8 @@ const startGraceTimer = (io: TypedServer, roomCode: string, userId: string): voi
 
 export const registerDisconnectHandlers = (io: TypedServer, socket: TypedSocket): void => {
   socket.on('disconnect', async (reason) => {
-    const { user } = socket.data;
-    console.log(`Socket disconnected: ${user.displayName} (${user._id}) — ${reason}`);
+    const { user, logger: log } = socket.data;
+    log.warn({ reason }, 'Socket disconnected');
 
     try {
       const roomCode = await roomService.getUserRoom(user._id);
@@ -107,7 +108,7 @@ export const registerDisconnectHandlers = (io: TypedServer, socket: TypedSocket)
         await roomService.removeSpectator(roomCode, user._id);
       }
     } catch (err) {
-      console.error('Error during disconnect handling:', err);
+      log.error({ err }, 'Error during disconnect handling');
     }
   });
 };

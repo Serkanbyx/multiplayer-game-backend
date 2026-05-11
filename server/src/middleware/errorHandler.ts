@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 import type { ApiResponse } from '../utils/apiResponse.js';
 
 interface AppError extends Error {
@@ -56,7 +57,7 @@ export const errorHandler = (
   _next: NextFunction,
 ): void => {
   if (err instanceof multer.MulterError) {
-    console.error('Multer Error:', err.code, err.message);
+    logger.error({ code: err.code, message: err.message }, 'Multer error');
     let message: string;
     if (err.code === 'LIMIT_FILE_SIZE') message = 'File too large — max 5 MB allowed';
     else if (err.code === 'LIMIT_FILE_COUNT') message = 'Too many files — only 1 allowed';
@@ -70,11 +71,7 @@ export const errorHandler = (
 
   const error = err as AppError;
 
-  console.error(
-    'Error:',
-    error.message,
-    env.NODE_ENV === 'development' ? error.stack : '',
-  );
+  logger.error({ err: error }, 'Unhandled error');
 
   let statusCode = error.statusCode ?? 500;
   let message = error.isOperational ? error.message : 'Internal server error';

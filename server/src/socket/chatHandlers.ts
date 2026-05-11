@@ -1,21 +1,12 @@
 import type { TypedServer, TypedSocket } from './index.js';
 import type { ChatMessage } from '../../../shared/types/room.js';
 import * as roomService from '../services/roomService.js';
+import { validateChatPayload } from '../validators/socketValidators.js';
 
 /* ─── Per-user throttle (500 ms) ──────────────────────────────── */
 
 const THROTTLE_MS = 500;
 const lastMessageAt = new Map<string, number>();
-
-/* ─── HTML escape — prevents stored XSS ──────────────────────── */
-
-const escapeHtml = (str: string): string =>
-  str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
 
@@ -36,13 +27,9 @@ export const registerChatHandlers = (io: TypedServer, socket: TypedSocket): void
       }
 
       /* ── Mesaj validasyonu ────────────────────────────────────── */
-      if (!data || typeof data.message !== 'string') {
-        return socket.emit('error', { code: 'CHAT_SEND_FAILED', message: 'Message is required' });
-      }
-
-      const trimmed = data.message.trim();
-      if (trimmed.length === 0 || trimmed.length > 300) {
-        return socket.emit('error', { code: 'CHAT_SEND_FAILED', message: 'Message must be 1–300 characters' });
+      const v = validateChatPayload(data);
+      if (!v.ok) {
+        return socket.emit('error', { code: v.code, message: v.message });
       }
 
       /* ── Socket'in bir odada olduğunu doğrula ─────────────────── */
@@ -65,7 +52,7 @@ export const registerChatHandlers = (io: TypedServer, socket: TypedSocket): void
       }
 
       /* ── Mesajı oluştur ve kaydet ─────────────────────────────── */
-      const sanitized = escapeHtml(trimmed);
+      const sanitized = v.value.message;
       const timestamp = new Date().toISOString();
 
       const chatMessage: ChatMessage = {

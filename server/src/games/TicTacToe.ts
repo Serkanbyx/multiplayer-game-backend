@@ -57,7 +57,7 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
     return this.getStateFor(null);
   }
 
-  #checkOutcome(): void {
+  private checkOutcome(): void {
     for (const [a, b, c] of TicTacToe.WINNING_LINES) {
       const v = this.board[a];
       if (v !== null && v === this.board[b] && v === this.board[c]) {
@@ -103,7 +103,7 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
     this.board[index] = currentPlayer.symbol;
     this.moves.push({ userId, index, symbol: currentPlayer.symbol, t: Date.now() });
 
-    this.#checkOutcome();
+    this.checkOutcome();
 
     if (this.result === null) {
       this.currentTurnIndex = this.currentTurnIndex === 0 ? 1 : 0;

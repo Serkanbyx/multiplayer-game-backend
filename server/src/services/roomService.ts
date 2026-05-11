@@ -83,6 +83,7 @@ export const updateRoom = async (
   const maxRetries = 5;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    await redis.unwatch();
     await redis.watch(key);
 
     const data = await redis.get(key);
@@ -100,10 +101,10 @@ export const updateRoom = async (
 
     const result = await multi.exec();
 
-    // exec() null dönerse transaction başarısız (conflict) — retry
     if (result) return updated;
   }
 
+  await redis.unwatch();
   throw new Error("ROOM_UPDATE_CONFLICT");
 };
 

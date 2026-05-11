@@ -112,7 +112,7 @@ export class CardGame extends BaseGame<CardGameState> {
       throw new Error('UNKNOWN_ACTION');
     }
 
-    if (!this.#isValidPlayPayload(payload)) {
+    if (!this.isValidPlayPayload(payload)) {
       throw new Error('INVALID_PAYLOAD');
     }
 
@@ -146,7 +146,7 @@ export class CardGame extends BaseGame<CardGameState> {
     this.moves.push({ userId, card, trickNumber: this.trickNumber, t: Date.now() });
 
     if (this.currentTrick.length === 4) {
-      this.#resolveTrick();
+      this.resolveTrick();
       return { stateChanged: true, gameOver: this.result !== null };
     }
 
@@ -244,9 +244,9 @@ export class CardGame extends BaseGame<CardGameState> {
     return instance;
   }
 
-  /* ─── Trick Resolution (JS private fields) ──────────────────── */
+  /* ─── Trick Resolution ──────────────────────────────────────── */
 
-  #resolveTrick(): void {
+  private resolveTrick(): void {
     const lead = this.leadSuit!;
     const followingLeadSuit = this.currentTrick.filter((c) => c.card.suit === lead);
     const winningEntry = followingLeadSuit.reduce((best, cur) =>
@@ -260,10 +260,10 @@ export class CardGame extends BaseGame<CardGameState> {
     this.leadSuit = null;
     this.trickNumber += 1;
 
-    if (this.trickNumber >= 13) this.#finalize();
+    if (this.trickNumber >= 13) this.finalize();
   }
 
-  #finalize(): void {
+  private finalize(): void {
     const entries = Object.entries(this.tricksWon);
     const maxTricks = Math.max(...entries.map(([, v]) => v));
     const topPlayers = entries.filter(([, v]) => v === maxTricks);
@@ -279,7 +279,7 @@ export class CardGame extends BaseGame<CardGameState> {
 
   /* ─── Validation ───────────────────────────────────────────── */
 
-  #isValidPlayPayload(payload: unknown): payload is { card: Card } {
+  private isValidPlayPayload(payload: unknown): payload is { card: Card } {
     if (typeof payload !== 'object' || payload === null) return false;
     const p = payload as Record<string, unknown>;
     if (typeof p.card !== 'object' || p.card === null) return false;

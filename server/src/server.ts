@@ -113,9 +113,11 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
-bootstrap().catch((err) => {
-  logger.fatal({ err }, 'Failed to start server');
-  process.exit(1);
-});
+if (env.NODE_ENV !== 'test') {
+  bootstrap().catch((err) => {
+    logger.fatal({ err }, 'Failed to start server');
+    process.exit(1);
+  });
+}
 
 export { app, httpServer, io };

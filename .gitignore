@@ -11,6 +11,9 @@ client/dist/
 # Local uploads (avatars in dev)
 server/uploads/
 
+# Test coverage
+coverage/
+
 # TypeScript build info
 *.tsbuildinfo
 

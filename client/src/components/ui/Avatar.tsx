@@ -1,7 +1,7 @@
 import { type ImgHTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
 
-type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 type AvatarProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   src?: string | null;
@@ -14,6 +14,7 @@ const sizeClasses: Record<AvatarSize, string> = {
   sm: 'h-8 w-8 text-xs',
   md: 'h-10 w-10 text-sm',
   lg: 'h-14 w-14 text-lg',
+  xl: 'h-24 w-24 text-2xl',
 };
 
 const getInitials = (name: string): string => {

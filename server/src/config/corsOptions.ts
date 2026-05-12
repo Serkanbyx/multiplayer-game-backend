@@ -2,14 +2,12 @@ import type { CorsOptions } from 'cors';
 import { env } from './env.js';
 
 /**
- * Vercel preview deployments are served from unique `*.vercel.app` subdomains
- * (one per PR / branch). To allow them through CORS without weakening
- * production rules, we accept the exact `CLIENT_ORIGIN` plus — only outside
- * production — any `*.vercel.app` host. Same-origin / server-to-server calls
- * (which arrive without an `Origin` header) are also allowed.
+ * Accepts the exact `CLIENT_ORIGIN` plus any `*.vercel.app` subdomain
+ * (Vercel preview deployments get unique subdomains per PR / branch).
+ * Same-origin / server-to-server calls (no `Origin` header) are allowed.
  *
- * The same allowlist is reused by Socket.io (`new Server(httpServer, { cors })`)
- * to keep one source of truth for cross-origin policy.
+ * Reused by Socket.io (`new Server(httpServer, { cors })`) for one
+ * source of truth.
  */
 
 const VERCEL_PREVIEW_HOST = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
@@ -18,7 +16,7 @@ const isAllowedOrigin = (origin: string): boolean => {
   if (origin === env.CLIENT_ORIGIN) {
     return true;
   }
-  if (env.NODE_ENV !== 'production' && VERCEL_PREVIEW_HOST.test(origin)) {
+  if (VERCEL_PREVIEW_HOST.test(origin)) {
     return true;
   }
   return false;

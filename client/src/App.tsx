@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { MainLayout, AdminLayout, SettingsLayout } from './components/layout';
 import {
@@ -8,27 +9,33 @@ import {
 } from './components/guards';
 import { useAnimations } from './hooks/useAnimations';
 import { usePageFocus } from './hooks/usePageFocus';
+import { Spinner } from './components/ui';
 
+/* Critical path — eagerly loaded */
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import GuestEntryPage from './pages/GuestEntryPage';
 import GameRoomPage from './pages/GameRoomPage';
-import LeaderboardPage from './pages/LeaderboardPage';
-import PublicProfilePage from './pages/PublicProfilePage';
-import MyProfilePage from './pages/MyProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminRooms from './pages/admin/AdminRooms';
-import AdminMatches from './pages/admin/AdminMatches';
+/* Lazy-loaded routes — visited rarely or by subset of users */
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
+const MyProfilePage = lazy(() => import('./pages/MyProfilePage'));
 
-import ProfileSettings from './pages/settings/ProfileSettings';
-import AccountSettings from './pages/settings/AccountSettings';
-import AppearanceSettings from './pages/settings/AppearanceSettings';
-import NotificationSettings from './pages/settings/NotificationSettings';
-import PrivacySettings from './pages/settings/PrivacySettings';
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminRooms = lazy(() => import('./pages/admin/AdminRooms'));
+const AdminMatches = lazy(() => import('./pages/admin/AdminMatches'));
+
+const ProfileSettings = lazy(() => import('./pages/settings/ProfileSettings'));
+const AccountSettings = lazy(() => import('./pages/settings/AccountSettings'));
+const AppearanceSettings = lazy(() => import('./pages/settings/AppearanceSettings'));
+const NotificationSettings = lazy(() => import('./pages/settings/NotificationSettings'));
+const PrivacySettings = lazy(() => import('./pages/settings/PrivacySettings'));
+
+const LazyFallback = () => <Spinner center />;
 
 function App() {
   const location = useLocation();
@@ -45,8 +52,14 @@ function App() {
         {/* Public routes inside MainLayout */}
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/u/:username" element={<PublicProfilePage />} />
+          <Route
+            path="/leaderboard"
+            element={<Suspense fallback={<LazyFallback />}><LeaderboardPage /></Suspense>}
+          />
+          <Route
+            path="/u/:username"
+            element={<Suspense fallback={<LazyFallback />}><PublicProfilePage /></Suspense>}
+          />
 
           {/* Guest-only routes (redirect if already authenticated) */}
           <Route element={<GuestOnlyRoute />}>
@@ -62,25 +75,28 @@ function App() {
 
           {/* Registered-only routes (logged in + not guest) */}
           <Route element={<RegisteredOnlyRoute />}>
-            <Route path="/profile" element={<MyProfilePage />} />
+            <Route
+              path="/profile"
+              element={<Suspense fallback={<LazyFallback />}><MyProfilePage /></Suspense>}
+            />
 
             {/* Settings with nested layout */}
             <Route path="/settings" element={<SettingsLayout />}>
-              <Route index element={<ProfileSettings />} />
-              <Route path="account" element={<AccountSettings />} />
-              <Route path="appearance" element={<AppearanceSettings />} />
-              <Route path="notifications" element={<NotificationSettings />} />
-              <Route path="privacy" element={<PrivacySettings />} />
+              <Route index element={<Suspense fallback={<LazyFallback />}><ProfileSettings /></Suspense>} />
+              <Route path="account" element={<Suspense fallback={<LazyFallback />}><AccountSettings /></Suspense>} />
+              <Route path="appearance" element={<Suspense fallback={<LazyFallback />}><AppearanceSettings /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={<LazyFallback />}><NotificationSettings /></Suspense>} />
+              <Route path="privacy" element={<Suspense fallback={<LazyFallback />}><PrivacySettings /></Suspense>} />
             </Route>
           </Route>
 
           {/* Admin routes */}
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="rooms" element={<AdminRooms />} />
-              <Route path="matches" element={<AdminMatches />} />
+              <Route index element={<Suspense fallback={<LazyFallback />}><AdminDashboard /></Suspense>} />
+              <Route path="users" element={<Suspense fallback={<LazyFallback />}><AdminUsers /></Suspense>} />
+              <Route path="rooms" element={<Suspense fallback={<LazyFallback />}><AdminRooms /></Suspense>} />
+              <Route path="matches" element={<Suspense fallback={<LazyFallback />}><AdminMatches /></Suspense>} />
             </Route>
           </Route>
 

@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 *.log
+stats.html
 
 # Vercel CLI artifacts
 .vercel/

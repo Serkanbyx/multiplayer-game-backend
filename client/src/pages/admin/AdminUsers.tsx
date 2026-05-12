@@ -182,7 +182,7 @@ const AdminUsers = () => {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar src={u.avatarUrl} name={u.displayName || u.username} size="sm" />
+                        <Avatar src={u.avatarUrl} name={u.displayName || u.username} size="sm" lazy />
                         <div className="min-w-0">
                           <p className="truncate font-medium text-fg">{u.displayName || u.username}</p>
                           <p className="truncate text-xs text-fg-muted">@{u.username}</p>

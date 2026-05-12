@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { GameType } from '@mpg/shared/types/games';
@@ -65,9 +65,16 @@ const LeaderboardPage = () => {
     setPage(1);
   };
 
-  const getRank = (index: number): number => {
-    return (page - 1) * ITEMS_PER_PAGE + index + 1;
-  };
+  const computedRows = useMemo(
+    () =>
+      entries.map((entry, index) => ({
+        entry,
+        rank: (page - 1) * ITEMS_PER_PAGE + index + 1,
+        stats: getDisplayStats(entry, gameFilter),
+        winRate: calculateWinRate(getDisplayStats(entry, gameFilter)),
+      })),
+    [entries, page, gameFilter],
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-6">
@@ -142,11 +149,7 @@ const LeaderboardPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {entries.map((entry, index) => {
-                  const rank = getRank(index);
-                  const stats = getDisplayStats(entry, gameFilter);
-
-                  return (
+                {computedRows.map(({ entry, rank, stats, winRate }) => (
                     <tr
                       key={entry.id}
                       className="bg-surface transition-colors hover:bg-surface/70"
@@ -179,6 +182,7 @@ const LeaderboardPage = () => {
                             src={entry.avatarUrl}
                             name={entry.displayName}
                             size="sm"
+                            lazy
                           />
                           <div className="min-w-0">
                             <p className="truncate font-medium text-fg group-hover:text-primary transition-colors">
@@ -205,11 +209,10 @@ const LeaderboardPage = () => {
                         {stats.gamesPlayed}
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-fg">
-                        {calculateWinRate(stats)}
+                        {winRate}
                       </td>
                     </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           </div>

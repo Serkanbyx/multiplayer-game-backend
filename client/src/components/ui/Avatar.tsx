@@ -7,6 +7,7 @@ type AvatarProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   src?: string | null | undefined;
   name: string;
   size?: AvatarSize;
+  lazy?: boolean;
 };
 
 const sizeClasses: Record<AvatarSize, string> = {
@@ -23,7 +24,7 @@ const getInitials = (name: string): string => {
   return name.slice(0, 2).toUpperCase();
 };
 
-export const Avatar = ({ src, name, size = 'md', className, alt, ...rest }: AvatarProps) => {
+export const Avatar = ({ src, name, size = 'md', lazy: lazyLoad, className, alt, ...rest }: AvatarProps) => {
   const base = cn(
     'inline-flex items-center justify-center rounded-full bg-primary/20 text-primary font-semibold shrink-0 select-none',
     sizeClasses[size],
@@ -35,6 +36,7 @@ export const Avatar = ({ src, name, size = 'md', className, alt, ...rest }: Avat
       <img
         src={src}
         alt={alt ?? name}
+        loading={lazyLoad ? 'lazy' : undefined}
         className={cn(base, 'object-cover')}
         {...rest}
       />

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import http from 'node:http';
 import path from 'node:path';
 import express from 'express';
+import compression from 'compression';
 import helmet from 'helmet';
 import cors from 'cors';
 import { pinoHttp } from 'pino-http';
@@ -30,6 +31,8 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(helmet());
+
+app.use(compression());
 
 app.use(cors(corsOptions));
 

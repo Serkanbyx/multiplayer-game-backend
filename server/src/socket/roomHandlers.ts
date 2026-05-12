@@ -3,6 +3,7 @@ import type { RoomPlayer, RoomSpectator } from '../../../shared/types/room.js';
 import { GameFactory } from '../games/GameFactory.js';
 import * as roomService from '../services/roomService.js';
 import { startGame, handleAbortOnLeave } from './gameHandlers.js';
+import { cancelGraceTimer } from './disconnectHandlers.js';
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
 
@@ -68,8 +69,29 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
         return callback({ success: false, error: 'Room code is required' });
       }
 
-      const existingRoom = await roomService.getUserRoom(userId);
-      if (existingRoom) {
+      const existingRoomCode = await roomService.getUserRoom(userId);
+      if (existingRoomCode) {
+        if (existingRoomCode === data.roomCode) {
+          const room = await roomService.getRoom(data.roomCode);
+          if (room) {
+            socket.join(socketRoomChannel(data.roomCode));
+
+            const isPlayer = room.players.some((p) => p.userId === userId);
+            if (isPlayer) {
+              cancelGraceTimer(data.roomCode, userId);
+              const updatedRoom = await roomService.updateRoom(data.roomCode, (current) => ({
+                ...current,
+                players: current.players.map((p) =>
+                  p.userId === userId ? { ...p, isConnected: true } : p,
+                ),
+              }));
+              io.in(socketRoomChannel(data.roomCode)).emit('room:updated', updatedRoom);
+              return callback({ success: true, room: updatedRoom });
+            }
+
+            return callback({ success: true, room });
+          }
+        }
         return callback({ success: false, error: 'You are already in a room' });
       }
 

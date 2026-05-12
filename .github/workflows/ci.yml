@@ -61,7 +61,7 @@ jobs:
           cache-dependency-path: server/package-lock.json
 
       - name: Install dependencies
-        run: npm install -g npm@11 && npm ci
+        run: npm install
         working-directory: server
 
       - name: Typecheck
@@ -98,7 +98,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
-        run: npm install -g npm@11 && npm ci
+        run: npm install
         working-directory: client
 
       - name: Typecheck
@@ -131,7 +131,7 @@ jobs:
           cache-dependency-path: shared/package-lock.json
 
       - name: Install dependencies
-        run: npm install -g npm@11 && npm ci
+        run: npm install
         working-directory: shared
 
       - name: Typecheck

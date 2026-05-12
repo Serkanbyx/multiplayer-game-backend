@@ -50,6 +50,10 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [lastDisconnectReason, setLastDisconnectReason] = useState<string | null>(null);
 
   const wasConnectedRef = useRef(false);
+  const navigateRef = useRef(navigate);
+  const logoutRef = useRef(logout);
+  navigateRef.current = navigate;
+  logoutRef.current = logout;
 
   const isConnected = connectionState === 'connected';
 
@@ -99,8 +103,8 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         setConnectionState('disconnected_terminal');
         setLastDisconnectReason('Session expired');
         localStorage.removeItem('token');
-        logout();
-        navigate('/login', { replace: true });
+        logoutRef.current();
+        navigateRef.current('/login', { replace: true });
         toast.error('Your session expired. Please log in again.');
         return;
       }
@@ -135,7 +139,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       setLastDisconnectReason(null);
       wasConnectedRef.current = false;
     };
-  }, [token, logout, navigate]);
+  }, [token]);
 
   const emit = useCallback(
     <K extends keyof ClientToServerEvents>(

@@ -6,6 +6,7 @@ import type { GameState, GameAction } from '@mpg/shared/types/games';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useSocketEvent } from '../hooks/useSocketEvent';
+import { useSounds } from '../hooks/useSounds';
 import { Badge, Button, Spinner, IconButton } from '../components/ui';
 import {
   PlayerList,
@@ -47,6 +48,7 @@ const GameRoomPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { emit, isConnected, connectionState } = useSocket();
+  const { play } = useSounds();
 
   /* ── Core state ── */
   const [room, setRoom] = useState<Room | null>(null);
@@ -233,17 +235,25 @@ const GameRoomPage = () => {
 
   const handleGameStateUpdated = useCallback(
     (data: { roomCode: string; gameState: GameState }) => {
-      setGameState(data.gameState);
+      setGameState((prev) => {
+        if (prev && data.gameState.currentTurnUserId === mySelfUserId) {
+          play('move');
+        }
+        return data.gameState;
+      });
       setCurrentTurnUserId(data.gameState.currentTurnUserId);
     },
-    [],
+    [mySelfUserId, play],
   );
 
   const handleGameTurn = useCallback(
     (data: { roomCode: string; currentPlayerId: string }) => {
       setCurrentTurnUserId(data.currentPlayerId);
+      if (data.currentPlayerId === mySelfUserId) {
+        play('turn');
+      }
     },
-    [],
+    [mySelfUserId, play],
   );
 
   const handleGameEnded = useCallback(
@@ -263,11 +273,21 @@ const GameRoomPage = () => {
       setCurrentTurnUserId(null);
       setRoom((prev) => (prev ? { ...prev, status: 'finished' } : prev));
 
+      if (data.result === 'draw') {
+        play('draw');
+      } else if (data.result === 'win') {
+        if (data.winnerId === mySelfUserId) {
+          play('win');
+        } else {
+          play('lose');
+        }
+      }
+
       countdownIntervalsRef.current.forEach((interval) => clearInterval(interval));
       countdownIntervalsRef.current.clear();
       setDisconnectedOpponents(new Map());
     },
-    [],
+    [mySelfUserId, play],
   );
 
   const handleChatMessage = useCallback(

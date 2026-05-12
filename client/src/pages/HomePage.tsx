@@ -6,6 +6,7 @@ import type { Room } from '@mpg/shared/types/room';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useSocketEvent } from '../hooks/useSocketEvent';
+import { useSounds } from '../hooks/useSounds';
 import { getActiveRooms } from '../api/adminService';
 import {
   Button,
@@ -39,6 +40,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
   const { emit, isConnected } = useSocket();
+  const { play } = useSounds();
 
   /* ── Create Room state ── */
   const [createGameType, setCreateGameType] = useState<GameType>('tictactoe');
@@ -71,10 +73,11 @@ const HomePage = () => {
     (data: { roomCode: string }) => {
       setIsQueued(false);
       setEstimatedWait(null);
+      play('match-found');
       toast.success('Match found! Joining room…');
       navigate(`/room/${data.roomCode}`);
     },
-    [navigate],
+    [navigate, play],
   );
 
   const handleMatchCancelled = useCallback(() => {

@@ -1,6 +1,7 @@
 import { type ButtonHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { Spinner } from './Spinner';
+import { useSounds } from '../../hooks/useSounds';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
@@ -35,12 +36,20 @@ const buttonVariants = ({ variant, size }: { variant: Variant; size: Size }): st
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', isLoading, leftIcon, children, className, disabled, ...rest }, ref) => {
+  ({ variant = 'primary', size = 'md', isLoading, leftIcon, children, className, disabled, onClick, ...rest }, ref) => {
+    const { play } = useSounds();
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      play('click', 0.3);
+      onClick?.(e);
+    };
+
     return (
       <button
         ref={ref}
         disabled={disabled || isLoading}
         className={cn(buttonVariants({ variant, size }), className)}
+        onClick={handleClick}
         {...rest}
       >
         {isLoading ? <Spinner size="sm" /> : leftIcon}

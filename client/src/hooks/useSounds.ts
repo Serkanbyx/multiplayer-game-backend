@@ -1,42 +1,49 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { usePreferences } from '../context/PreferencesContext';
 
-type SoundName = 'turn' | 'win' | 'lose' | 'click';
+type SoundName = 'click' | 'turn' | 'move' | 'win' | 'lose' | 'draw' | 'chat' | 'match-found';
 
 const SOUND_PATHS: Record<SoundName, string> = {
+  click: '/sounds/click.mp3',
   turn: '/sounds/turn.mp3',
+  move: '/sounds/move.mp3',
   win: '/sounds/win.mp3',
   lose: '/sounds/lose.mp3',
-  click: '/sounds/click.mp3',
+  draw: '/sounds/draw.mp3',
+  chat: '/sounds/chat.mp3',
+  'match-found': '/sounds/match-found.mp3',
 };
 
 export const useSounds = () => {
   const { preferences } = usePreferences();
-  const audioCache = useRef<Map<SoundName, HTMLAudioElement>>(new Map());
+  const cacheRef = useRef<Map<SoundName, HTMLAudioElement>>(new Map());
 
-  /* Preload all sound files */
   useEffect(() => {
     const entries = Object.entries(SOUND_PATHS) as [SoundName, string][];
     for (const [name, path] of entries) {
-      if (!audioCache.current.has(name)) {
+      if (!cacheRef.current.has(name)) {
         const audio = new Audio(path);
         audio.preload = 'auto';
-        audioCache.current.set(name, audio);
+        cacheRef.current.set(name, audio);
       }
     }
   }, []);
 
   const play = useCallback(
-    (name: SoundName) => {
+    (name: SoundName, volumeOverride?: number): void => {
       if (!preferences.sounds) return;
 
-      const audio = audioCache.current.get(name);
-      if (!audio) return;
+      let audio = cacheRef.current.get(name);
+      if (!audio) {
+        audio = new Audio(`/sounds/${name}.mp3`);
+        audio.preload = 'auto';
+        cacheRef.current.set(name, audio);
+      }
 
-      audio.volume = preferences.soundVolume;
       audio.currentTime = 0;
-      audio.play().catch(() => {
-        /* autoplay blocked by browser — silently ignore */
+      audio.volume = volumeOverride ?? preferences.soundVolume ?? 0.7;
+      void audio.play().catch(() => {
+        /* autoplay policy may block — silent fail */
       });
     },
     [preferences.sounds, preferences.soundVolume],

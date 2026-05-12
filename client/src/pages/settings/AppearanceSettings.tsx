@@ -1,4 +1,4 @@
-import { Sun, Moon, Monitor, Type } from 'lucide-react';
+import { Sun, Moon, Monitor, Type, Volume2 } from 'lucide-react';
 import { usePreferences } from '../../context/PreferencesContext';
 import { SelectableCard, ToggleSwitch } from '../../components/ui';
 import type { UserPreferences } from '@mpg/shared/types/user';
@@ -41,6 +41,10 @@ const AppearanceSettings = () => {
 
   const handleSoundsChange = (sounds: boolean) => {
     setPreferences({ sounds });
+  };
+
+  const handleSoundVolumeChange = (soundVolume: number) => {
+    setPreferences({ soundVolume });
   };
 
   return (
@@ -116,6 +120,34 @@ const AppearanceSettings = () => {
               onChange={handleSoundsChange}
             />
           </div>
+
+          {preferences.sounds && (
+            <>
+              <div className="border-t border-border" />
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-fg-muted" />
+                  <label className="text-sm font-medium text-fg">
+                    Sound Volume
+                  </label>
+                  <span className="ml-auto text-xs text-fg-muted tabular-nums">
+                    {Math.round((preferences.soundVolume ?? 0.7) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={preferences.soundVolume ?? 0.7}
+                  onChange={(e) => handleSoundVolumeChange(Number(e.target.value))}
+                  className="w-full accent-primary cursor-pointer"
+                  aria-label="Sound volume"
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
     </div>

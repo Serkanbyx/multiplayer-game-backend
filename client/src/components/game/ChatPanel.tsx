@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import type { ChatMessage } from '@mpg/shared/types/room';
 import { CharacterCounter } from '../ui/CharacterCounter';
 import { cn } from '../../utils/cn';
+import { useSounds } from '../../hooks/useSounds';
 
 type ChatPanelProps = {
   messages: ChatMessage[];
@@ -50,6 +51,18 @@ export const ChatPanel = memo(({ messages, onSend, mySelfUserId, throttledUntil 
   const [remainingMs, setRemainingMs] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAutoScrollRef = useRef(true);
+  const { play } = useSounds();
+  const prevMessageCountRef = useRef(messages.length);
+
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current && document.hidden) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.userId !== mySelfUserId) {
+        play('chat');
+      }
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages, mySelfUserId, play]);
 
   /* Throttle countdown timer */
   useEffect(() => {

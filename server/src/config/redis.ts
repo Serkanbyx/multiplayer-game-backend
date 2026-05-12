@@ -9,6 +9,7 @@ const createClient = (label: string): Redis => {
     lazyConnect: false,
     maxRetriesPerRequest: 3,
     enableReadyCheck: true,
+    family: 4,
   });
 
   client.on('connect', () => log.info('Connecting'));

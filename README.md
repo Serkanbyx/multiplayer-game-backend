@@ -242,7 +242,8 @@
 │       ├── events.ts        # ClientToServerEvents, ServerToClientEvents, SocketData
 │       └── api.ts           # ApiResponse, PaginatedResponse, ErrorResponse
 │
-├── STEPS.md
+├── docs/
+│   └── build-guide.md
 └── README.md
 ```
 
@@ -250,7 +251,7 @@
 
 ## Security
 
-The project follows a comprehensive security audit (see Step 27 in `STEPS.md`):
+The project follows a comprehensive security audit (see Step 27 in `docs/build-guide.md`):
 
 - **Mass Assignment Protection** — Controllers destructure only allowed fields; no `req.body` spread
 - **Role Protection** — `role` field not settable via public endpoints; only admin can change roles
@@ -403,7 +404,7 @@ npm run test:coverage
 - **Database** — [Neon](https://neon.tech) serverless Postgres. Copy the connection string to `DATABASE_URL`.
 - **Redis** — Use a managed Redis provider (Upstash, Redis Cloud, etc.). Copy the connection string to `REDIS_URL`.
 
-> See Step 55 in `STEPS.md` for detailed deployment instructions.
+> See Step 55 in `docs/build-guide.md` for detailed deployment instructions.
 
 ---
 

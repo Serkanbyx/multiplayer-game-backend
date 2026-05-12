@@ -1,23 +1,28 @@
 # Multiplayer Game Backend — Step-by-Step Build Guide
 
+> **Archived: original build playbook.**
+> This document is the original roadmap used to build the Multiplayer Game Backend project from scratch. The codebase may have evolved since this guide was written — consult the [README](../README.md) for current setup, architecture, and deployment notes.
+
+---
+
 > **Project Summary:**
 > A real-time multiplayer game platform built on Node.js + Socket.io with Redis as the live game-state store and Neon (serverless PostgreSQL) accessed through Drizzle ORM as the persistent user/leaderboard store. Two roles (Player, Admin) and two participation modes (registered + guest) are supported. Players can create/join rooms with a UUID code, auto-match through a queue, spectate live games, chat in-room, request rematches, and track stats on a global leaderboard. The system ships with two games — TicTacToe (2 players) and a simple 4-player card game — implemented behind a GameFactory pattern so additional games can be plugged in without touching transport, room, or state code. All game logic runs server-side; the client is a thin renderer that forwards intents (e.g., "play cell index 4") and renders the authoritative state pushed back over Socket.io. Security layers include JWT-authenticated WebSocket handshakes, helmet, strict CORS, per-route rate limiting, mass-assignment protection, parameterized SQL queries, RBAC guards, and admin self-protection.
 
-> Each step below is a self-contained prompt. Execute them in order.
-> Stack: **TypeScript 5** end-to-end, React 19 + Vite, Node 20 LTS, Express 5, Socket.io 4, **Neon (PostgreSQL serverless) + Drizzle ORM**, Redis (ioredis), JWT, TailwindCSS v4, React Router v7, Axios, socket.io-client.
-> Shared types live in a top-level `shared/` package consumed by both `server/` and `client/` so socket event payloads, game state shapes, JWT claims, and REST responses are statically guaranteed across the wire.
+Each step below is a self-contained prompt. Execute them in order.
+Stack: **TypeScript 5** end-to-end, React 19 + Vite, Node 20 LTS, Express 5, Socket.io 4, **Neon (PostgreSQL serverless) + Drizzle ORM**, Redis (ioredis), JWT, TailwindCSS v4, React Router v7, Axios, socket.io-client.
+Shared types live in a top-level `shared/` package consumed by both `server/` and `client/` so socket event payloads, game state shapes, JWT claims, and REST responses are statically guaranteed across the wire.
 
 ---
 
 ## Table of Contents
 
-**Phase 1 — Backend Foundation**
+**PHASE 1 — Backend Foundation**
 - STEP 1 — Project Scaffolding & Dependency Setup
 - STEP 2 — Environment Configuration, Neon Postgres (Drizzle) & Redis Connection
 - STEP 3 — User Model, Auth System & Admin Seed
 - STEP 4 — Guest Authentication Flow
 
-**Phase 2 — Backend Resources (REST API)**
+**PHASE 2 — Backend Resources (REST API)**
 - STEP 5 — User Profile API (Public & Own)
 - STEP 6 — Avatar Upload (Multer + File Validation)
 - STEP 7 — Preferences API (Theme, Privacy, Notifications)
@@ -25,7 +30,7 @@
 - STEP 9 — Leaderboard API
 - STEP 10 — Admin REST API (Dashboard, User Management, Active Rooms)
 
-**Phase 3 — Socket.io Real-Time Foundation**
+**PHASE 3 — Socket.io Real-Time Foundation**
 - STEP 11 — Socket.io Server Setup & JWT Auth Middleware
 - STEP 12 — Redis Service Layer (Rooms, Queues, TTL)
 - STEP 13 — Room Management Events (Create, Join, Leave)
@@ -33,7 +38,7 @@
 - STEP 15 — Matchmaking Queue
 - STEP 16 — In-Room Chat System
 
-**Phase 4 — Game Logic (Server-Side)**
+**PHASE 4 — Game Logic (Server-Side)**
 - STEP 17 — GameFactory Pattern & Base Game Class
 - STEP 18 — TicTacToe — Move Validation & Turn Mechanics
 - STEP 19 — TicTacToe — Win Detection & State Lifecycle
@@ -43,23 +48,23 @@
 - STEP 23 — Game Lifecycle (Start, Turn, End, Rematch)
 - STEP 24 — Disconnect Handling & Reconnection (Server-Side)
 
-**Phase 5 — Backend Validation, Security & Logging**
+**PHASE 5 — Backend Validation, Security & Logging**
 - STEP 25 — REST Validators (express-validator chains)
 - STEP 26 — Socket Event Validators (Type-Narrowing Helpers)
 - STEP 27 — Comprehensive Security Audit Checklist
 - STEP 28 — Logging & Observability (pino + structured logs)
 
-**Phase 6 — Backend Testing**
+**PHASE 6 — Backend Testing**
 - STEP 29 — Unit Tests (Game Logic, Utils, Validators)
 - STEP 30 — Integration Tests (REST + Socket.io flows)
 
-**Phase 7 — Client Foundation**
+**PHASE 7 — Client Foundation**
 - STEP 31 — Client Setup: Vite, Tailwind, Axios, Socket.io-client
 - STEP 32 — Reusable UI Kit (Button, Input, Modal, Spinner, Card, Badge)
 - STEP 33 — Contexts: Auth, Socket, Preferences
 - STEP 34 — Layouts, Navbar & Routing
 
-**Phase 8 — Client Pages**
+**PHASE 8 — Client Pages**
 - STEP 35 — Auth Pages (Login, Register, Guest Entry)
 - STEP 36 — Home / Lobby Page (Create / Join / Matchmake)
 - STEP 37 — Game Room Page Orchestration
@@ -71,7 +76,7 @@
 - STEP 43 — Settings Pages
 - STEP 44 — Admin Pages (Dashboard, Users, Active Rooms)
 
-**Phase 9 — Client Polish**
+**PHASE 9 — Client Polish**
 - STEP 45 — Reconnection UX Flow (Banner, Retry, Rejoin Toast)
 - STEP 46 — Animations & Game Feel (Transitions, Piece Drop, Card Flip, Win Highlight)
 - STEP 47 — Sound Design (Preload, Volume, Mute, Contextual Triggers)
@@ -79,10 +84,10 @@
 - STEP 49 — Performance (React.memo, Code Splitting, Lazy Routes, useCallback Strategy)
 - STEP 50 — Responsive Design (Mobile Game Room, Touch Targets, Adaptive Board)
 
-**Phase 10 — Client Testing**
+**PHASE 10 — Client Testing**
 - STEP 51 — Component Tests (React Testing Library: forms, board, chat)
 
-**Phase 11 — DevOps & Deploy**
+**PHASE 11 — DevOps & Deploy**
 - STEP 52 — README & Architecture Documentation
 - STEP 53 — CI/CD (GitHub Actions: typecheck + lint + test on PR)
 - STEP 54 — Code Cleanup & Pre-Deploy Review
@@ -90,7 +95,64 @@
 
 ---
 
-# PHASE 1 — Backend Foundation
+## Global Build Rules (apply to EVERY step)
+
+- Do not run `git` commands. Version control is handled manually by the user.
+- Do not install packages not listed in the step's dependency list without explicit approval.
+- Do not run long-running processes (dev servers, watchers) unless the step explicitly asks for it.
+- Treat every step as self-contained: read its instructions, implement, verify acceptance criteria, then stop.
+- Follow the project's TypeScript strict mode (`strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`). No `any`, no `@ts-ignore`.
+- All wire-crossing types (Socket.io events, REST responses, JWT claims) must come from `shared/types/*.ts` — never duplicate type definitions.
+
+---
+
+## Architecture at a Glance
+
+```mermaid
+flowchart LR
+    Client["Client\nReact 19 + Vite\nsocket.io-client"]
+    Server["Server\nExpress 5 + Socket.io 4\nNode 20 LTS"]
+    Redis["Redis Cloud\nRooms, Queues, TTL"]
+    Postgres["Neon Postgres\nUsers, Matches\nStats (jsonb)"]
+    Vercel["Vercel\n(hosting)"]
+    Render["Render\n(hosting)"]
+
+    Client -->|"HTTPS REST + WSS\n(shared/ types)"| Server
+    Server -->|"JWT auth"| Redis
+    Server -->|"Drizzle ORM"| Postgres
+    Client -.->|"deployed on"| Vercel
+    Server -.->|"deployed on"| Render
+```
+
+```
+                  +---------------+
+                  |   Client      |  React 19 + Vite + TypeScript
+                  |  (Vercel)     |  socket.io-client (typed)
+                  +-------+-------+
+                          |  HTTPS REST + WSS
+                          |  (shared/ types ensure contract)
+                          v
+                  +---------------+
+                  |   Server      |  Express 5 + Socket.io 4 + TypeScript
+                  |  (Render)     |  Node 20 LTS, compiled to dist/
+                  +---+-------+---+
+                      |       |
+             JWT auth |       | Drizzle ORM
+                      v       v
+               +---------+ +--------------+
+               |  Redis  | |   Postgres   |
+               | (Cloud) | |    (Neon)    |
+               | Rooms,  | |  Users,      |
+               | Queues, | |  Matches,    |
+               | TTL     | |  Stats jsonb |
+               +---------+ +--------------+
+```
+
+---
+
+# PHASE 1 — BACKEND FOUNDATION
+
+---
 
 ## STEP 1 — Project Scaffolding & Dependency Setup
 
@@ -137,14 +199,11 @@ server/
 │   │   ├── migrate.ts                 # Standalone migration runner (`npm run db:migrate`)
 │   │   └── schema/
 │   │       └── index.ts               # All pgTable definitions (users + matches) in one file
-│   │                                  # — drizzle-kit's CJS loader cannot resolve cross-file
-│   │                                  #   `.js` imports between schema files, so we keep them
-│   │                                  #   colocated here and split only if the file grows beyond ~300 lines.
 │   ├── middleware/
 │   │   ├── authMiddleware.ts          # protect, optionalAuth, adminOnly, registeredOnly
 │   │   ├── errorHandler.ts
 │   │   ├── rateLimiters.ts            # global, auth, admin, upload
-│   │   ├── sanitizeMiddleware.ts      # input shape sanitization (defense-in-depth even with parameterized SQL)
+│   │   ├── sanitizeMiddleware.ts      # input shape sanitization
 │   │   └── uploadMiddleware.ts        # multer config
 │   ├── controllers/
 │   │   ├── authController.ts
@@ -170,12 +229,12 @@ server/
 │   │   ├── BaseGame.ts                # abstract class + GameConfig
 │   │   ├── TicTacToe.ts               # extends BaseGame<TicTacToeState>
 │   │   ├── CardGame.ts                # extends BaseGame<CardGameState>
-│   │   └── GameFactory.ts             # generic registry (compile-time game-type → class map)
+│   │   └── GameFactory.ts             # generic registry (compile-time game-type -> class map)
 │   ├── services/
 │   │   ├── roomService.ts             # Redis CRUD for rooms
 │   │   ├── matchmakingService.ts
 │   │   ├── matchService.ts            # Postgres match-history + atomic stat increments
-│   │   └── userService.ts             # createUser (with bcrypt), changePassword (replaces Mongoose pre-save hooks)
+│   │   └── userService.ts             # createUser (with bcrypt), changePassword
 │   ├── utils/
 │   │   ├── generateToken.ts
 │   │   ├── generateRoomCode.ts
@@ -358,7 +417,7 @@ client/
 | Script | Command | Purpose |
 |---|---|---|
 | `dev` | `tsx watch src/server.ts` | Hot-reload dev server (no nodemon needed) |
-| `build` | `tsc -p tsconfig.json` | Compile TS → `dist/` |
+| `build` | `tsc -p tsconfig.json` | Compile TS to `dist/` |
 | `start` | `node dist/src/server.js` | Production runtime (Render uses this) |
 | `typecheck` | `tsc --noEmit` | Standalone type check |
 | `db:generate` | `drizzle-kit generate` | Generate SQL migration files from schema diffs |
@@ -423,7 +482,7 @@ Build the environment access layer, connect to Neon Postgres through Drizzle ORM
 | `CLIENT_ORIGIN` | yes | — | URL (no wildcard in production) |
 | `ROOM_TTL_SECONDS` | no | `7200` | integer (2h default) |
 | `MATCHMAKING_TTL_SECONDS` | no | `300` | integer |
-| `BCRYPT_SALT_ROUNDS` | no | `12` | integer ≥ 10 |
+| `BCRYPT_SALT_ROUNDS` | no | `12` | integer >= 10 |
 | `UPLOAD_MAX_BYTES` | no | `5242880` | integer (5 MB) |
 
 On startup, if `NODE_ENV === 'production'` and `JWT_SECRET.length < 32`, throw and exit immediately.
@@ -437,14 +496,14 @@ import { env } from '../config/env.js';
 import * as schema from './schema/index.js';
 
 const client = postgres(env.DATABASE_URL, {
-  max: env.NODE_ENV === 'production' ? 10 : 5,   // Neon free tier: keep pool small
-  idle_timeout: 20,                                // close idle conns to free Neon compute hours
+  max: env.NODE_ENV === 'production' ? 10 : 5,
+  idle_timeout: 20,
   connect_timeout: 10,
-  prepare: false,                                  // required for Neon's transaction-mode pooler
+  prepare: false,
 });
 
 export const db = drizzle(client, { schema, logger: env.LOG_LEVEL === 'debug' });
-export const dbClient = client;                    // raw access for graceful shutdown
+export const dbClient = client;
 ```
 
 **`db/migrate.ts`** — runs pending migrations on startup or via `npm run db:migrate`:
@@ -477,7 +536,7 @@ export default defineConfig({
 ```
 
 **Connection lifecycle:**
-- App starts → `db` is lazy-imported when first query runs (postgres-js connects on first query).
+- App starts -> `db` is lazy-imported when first query runs (postgres-js connects on first query).
 - Health check (`GET /api/health`) executes `SELECT 1` to verify connectivity.
 - Graceful shutdown (SIGTERM): `await dbClient.end({ timeout: 5 })`.
 
@@ -497,7 +556,7 @@ export default defineConfig({
 7. `app.use(express.urlencoded({ extended: true, limit: '10kb' }))`.
 8. `app.use(sanitizeMiddleware)` — strips prototype-pollution keys and clamps depth (see snippet).
 9. `app.use('/api', globalLimiter)`.
-10. `GET /api/health` → `{ status: 'ok', uptime, db: <state>, redis: <state> }`.
+10. `GET /api/health` -> `{ status: 'ok', uptime, db: <state>, redis: <state> }`.
 11. Mount routers (`/api/auth`, `/api/users`, `/api/matches`, `/api/leaderboard`, `/api/admin`).
 12. `app.use(errorHandler)` last.
 13. Create HTTP server with `http.createServer(app)`, attach `socket.io` (Step 11). The Drizzle client is imported lazily and connects on first query. In production startup, optionally `await migrate(...)` to apply pending migrations before listening (or run migrations as a separate Render predeploy step — see Step 55). Finally `httpServer.listen(env.PORT)`.
@@ -574,7 +633,7 @@ Implement the registered-user authentication path. (Guest path is added in Step 
 | `password` | `varchar(255)` | not null | bcrypt hash; **never** selected in default queries via `usersPublicView` (see below) |
 | `displayName` | `varchar(30)` | not null | |
 | `avatarUrl` | `varchar(500)` | default `''`, not null | |
-| `role` | `varchar(10)` | `$type<'player' \| 'admin'>()`, default `'player'`, not null | enforced at app layer; consider Postgres `enum` for stronger guarantee |
+| `role` | `varchar(10)` | `$type<'player' \| 'admin'>()`, default `'player'`, not null | enforced at app layer |
 | `isGuest` | `boolean` | default `false`, not null | always `false` here; guests have no row |
 | `bio` | `varchar(200)` | default `''`, not null | |
 | `stats` | `jsonb` | `$type<UserStats>()`, default `{ wins:0, losses:0, draws:0, gamesPlayed:0 }`, not null | |
@@ -592,7 +651,7 @@ Implement the registered-user authentication path. (Guest path is added in Step 
 | `fontSize` | `'small' \| 'medium' \| 'large'` | `'medium'` | |
 | `animations` | `boolean` | `true` | |
 | `sounds` | `boolean` | `true` | |
-| `soundVolume` | `number` | `0.7` | 0–1 |
+| `soundVolume` | `number` | `0.7` | 0-1 |
 | `language` | `'en'` | `'en'` | |
 | `notifications.matchInvite` | `boolean` | `true` | |
 | `notifications.rematch` | `boolean` | `true` | |
@@ -686,7 +745,6 @@ export const usersPublicSelect = {
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 } as const;
-// usage: db.select(usersPublicSelect).from(users)
 ```
 
 **`utils/generateToken.ts`** — `generateToken(payload: JwtPayload): string` signs with `JWT_SECRET`, expiry `JWT_EXPIRES_IN` for users / `GUEST_JWT_EXPIRES_IN` for guests. `JwtPayload` is the discriminated union from `shared/types/auth.ts`.
@@ -786,7 +844,7 @@ Guests can join games without registering. They get a short-lived JWT bound to a
 
 | Function | Method/Path | Body / Behavior |
 |---|---|---|
-| `loginAsGuest` | POST `/api/auth/guest` | `{ displayName }`. Validate displayName (3–20 chars, trim, escape). Generate UUID v4 as guest id. Sign JWT payload `{ id: guestId, role: 'player', isGuest: true, displayName }` with `GUEST_JWT_EXPIRES_IN`. Return `{ user: { _id: guestId, displayName, isGuest: true, role: 'player' }, token }`. |
+| `loginAsGuest` | POST `/api/auth/guest` | `{ displayName }`. Validate displayName (3-20 chars, trim, escape). Generate UUID v4 as guest id. Sign JWT payload `{ id: guestId, role: 'player', isGuest: true, displayName }` with `GUEST_JWT_EXPIRES_IN`. Return `{ user: { _id: guestId, displayName, isGuest: true, role: 'player' }, token }`. |
 
 **`middleware/authMiddleware.ts` — `protect` upgrade** (TypeScript discriminated-union narrowing handles guest/registered safely):
 - If decoded payload has `isGuest === true`, do **not** query Postgres. Build `req.user` from token claims directly.
@@ -804,7 +862,7 @@ Guests can join games without registering. They get a short-lived JWT bound to a
 - Match history writer (Step 8) checks `isGuest` on each player; if true, stores `{ userId: null, displayName, isGuest: true }`.
 
 **SECURITY:**
-- Guest tokens TTL ≤ 2 hours — abandoned guests cannot linger forever.
+- Guest tokens TTL <= 2 hours — abandoned guests cannot linger forever.
 - `guestLoginValidator` escapes `displayName` to prevent XSS through chat or scoreboards.
 - `registeredOnly` middleware on profile/admin routes blocks any guest privilege escalation attempts via crafted tokens.
 - Guest `id` is a fresh UUID per session — no replay across guest sessions.
@@ -812,7 +870,9 @@ Guests can join games without registering. They get a short-lived JWT bound to a
 
 ---
 
-# PHASE 2 — Backend Resources (REST API)
+# PHASE 2 — BACKEND RESOURCES (REST API)
+
+---
 
 ## STEP 5 — User Profile API (Public & Own)
 
@@ -837,7 +897,7 @@ export type PublicUser = {
   bio: string;
   role: 'player' | 'admin';
   createdAt: string;
-  stats?: UserStats;            // omitted when privacy.showStats === false
+  stats?: UserStats;
   statsByGame?: Record<GameType, UserStats>;
 };
 ```
@@ -930,7 +990,7 @@ A focused endpoint for per-user preferences with strict per-key validation, used
 |---|---|---|
 | `updateMyPreferences` | PATCH `/api/users/me/preferences` | Body is a partial `UserPreferences` object. Whitelist each top-level key and each nested key. Reject unknown keys with 400. Apply via `$set` with dot-notation paths so partial updates don't overwrite unrelated nested fields. |
 
-**Implementation pattern (`updateMyPreferences`)** — load → deep-merge against current jsonb → write back atomically. Postgres `jsonb_set` could be used for surgical updates, but a read-modify-write within a single transaction is simpler and safe here because each user only has their own preferences:
+**Implementation pattern (`updateMyPreferences`)** — load -> deep-merge against current jsonb -> write back atomically. Postgres `jsonb_set` could be used for surgical updates, but a read-modify-write within a single transaction is simpler and safe here because each user only has their own preferences:
 
 ```ts
 import { eq } from 'drizzle-orm';
@@ -1018,7 +1078,6 @@ Persist completed games to Postgres and increment per-user stats atomically usin
 **Player-history query pattern:**
 
 ```ts
-// Last 20 matches that include this user (uses GIN index above)
 const myMatches = await db.select()
   .from(matches)
   .where(sql`${matches.players} @> ${JSON.stringify([{ userId }])}::jsonb`)
@@ -1039,7 +1098,6 @@ const myMatches = await db.select()
 import { sql, eq } from 'drizzle-orm';
 import { users } from '../db/schema/users.js';
 
-// outcome ∈ 'wins' | 'losses' | 'draws'
 const incrementStats = (tx: typeof db, userId: string, gameType: GameType, outcome: 'wins' | 'losses' | 'draws') =>
   tx.update(users).set({
     stats: sql`jsonb_set(
@@ -1135,7 +1193,9 @@ Admin-only endpoints; all live behind `adminOnly` and `adminLimiter`.
 
 ---
 
-# PHASE 3 — Socket.io Real-Time Foundation
+# PHASE 3 — SOCKET.IO REAL-TIME FOUNDATION
+
+---
 
 ## STEP 11 — Socket.io Server Setup & JWT Auth Middleware
 
@@ -1149,8 +1209,8 @@ import type { Room, RoomPlayer } from './room';
 import type { AuthUser } from './auth';
 
 export type GameAction =
-  | { action: 'play'; payload: { index: number } }              // TicTacToe
-  | { action: 'play_card'; payload: { card: Card } };           // CardGame
+  | { action: 'play'; payload: { index: number } }
+  | { action: 'play_card'; payload: { card: Card } };
 
 export interface ClientToServerEvents {
   'room:create':           (data: { gameType: GameType; isPrivate: boolean }) => void;
@@ -1205,11 +1265,9 @@ registerSocketHandlers(io);
 - Read token from `socket.handshake.auth.token` (preferred) or `socket.handshake.headers.authorization`.
 - `jwt.verify(token, env.JWT_SECRET) as JwtPayload`.
 - For guest tokens (discriminant `isGuest === true`), build `socket.data.user` from claims directly.
-- For registered tokens, fetch user from Postgres by `id` via `db.select({ id: users.id, role: users.role, displayName: users.displayName, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, decoded.id)).limit(1)`; if no row, reject.
+- For registered tokens, fetch user from Postgres by `id`.
 - Set `socket.data.user = { _id, displayName, role, isGuest, avatarUrl }` and `socket.join(\`user:${_id}\`)`.
 - On error: `next(new Error('UNAUTHORIZED'))`.
-
-`io.use(authSocket)` registered before any `io.on('connection')`.
 
 **`socket/index.ts`** — `registerSocketHandlers(io: TypedServer): void`:
 - Apply `io.use(authSocket)`.
@@ -1221,23 +1279,23 @@ registerSocketHandlers(io);
 
 | Direction | Event | Payload |
 |---|---|---|
-| C→S | `room:create` | `{ gameType, isPrivate }` |
-| C→S | `room:join` | `{ roomCode, asSpectator }` |
-| C→S | `room:leave` | `{}` |
-| C→S | `matchmaking:join` | `{ gameType }` |
-| C→S | `matchmaking:cancel` | `{}` |
-| C→S | `game:action` | `{ action, payload }` (game-specific intent only) |
-| C→S | `game:rematch_request` | `{}` |
-| C→S | `chat:send` | `{ message }` |
-| S→C | `room:state` | full sanitized room snapshot |
-| S→C | `room:player_joined` | `{ player }` |
-| S→C | `room:player_left` | `{ playerId, reason }` |
-| S→C | `room:closed` | `{ reason }` |
-| S→C | `game:state` | sanitized game state |
-| S→C | `game:turn` | `{ currentPlayerId }` |
-| S→C | `game:end` | `{ result, winnerId, winnerDisplayName, matchId }` |
-| S→C | `chat:message` | `{ from, displayName, message, timestamp }` |
-| S→C | `error_event` | `{ code, message }` |
+| C->S | `room:create` | `{ gameType, isPrivate }` |
+| C->S | `room:join` | `{ roomCode, asSpectator }` |
+| C->S | `room:leave` | `{}` |
+| C->S | `matchmaking:join` | `{ gameType }` |
+| C->S | `matchmaking:cancel` | `{}` |
+| C->S | `game:action` | `{ action, payload }` (game-specific intent only) |
+| C->S | `game:rematch_request` | `{}` |
+| C->S | `chat:send` | `{ message }` |
+| S->C | `room:state` | full sanitized room snapshot |
+| S->C | `room:player_joined` | `{ player }` |
+| S->C | `room:player_left` | `{ playerId, reason }` |
+| S->C | `room:closed` | `{ reason }` |
+| S->C | `game:state` | sanitized game state |
+| S->C | `game:turn` | `{ currentPlayerId }` |
+| S->C | `game:end` | `{ result, winnerId, winnerDisplayName, matchId }` |
+| S->C | `chat:message` | `{ from, displayName, message, timestamp }` |
+| S->C | `error_event` | `{ code, message }` |
 
 **SECURITY:**
 - Every connection requires a valid JWT — anonymous WebSocket connections are rejected at the handshake.
@@ -1300,7 +1358,7 @@ Centralize all Redis read/writes behind a service so handlers stay thin and TTL/
 | `appendChat(roomCode, message)` | Mutator. Hard-cap chat array length at 50 (drop oldest). |
 | `listAllRooms()` | `SMEMBERS room:index` then pipelined `MGET`. Skip stale codes whose key has expired. |
 
-**`utils/generateRoomCode.ts`:** `generateRoomCode(): string` → first 8 hex chars from `uuidv4().replace(/-/g, '')`.
+**`utils/generateRoomCode.ts`:** `generateRoomCode(): string` -> first 8 hex chars from `uuidv4().replace(/-/g, '')`.
 
 **SECURITY:**
 - TTL on every room key — abandoned rooms self-clean.
@@ -1319,9 +1377,9 @@ Implement `room:create`, `room:join`, `room:leave` and the consequent broadcasts
 
 | Event | Server-side flow |
 |---|---|
-| `room:create` | Validate `{ gameType ∈ {tictactoe, cardgame}, isPrivate: boolean }`. Refuse if user already in a live room (`user:room:<id>` exists). Determine `maxPlayers` from `GameFactory.getConfig(gameType).maxPlayers`. Call `roomService.createRoom`. `socket.join(\`room:${roomCode}\`)`. Emit `room:state` to socket. |
+| `room:create` | Validate `{ gameType, isPrivate }`. Refuse if user already in a live room (`user:room:<id>` exists). Determine `maxPlayers` from `GameFactory.getConfig(gameType).maxPlayers`. Call `roomService.createRoom`. `socket.join(\`room:${roomCode}\`)`. Emit `room:state` to socket. |
 | `room:join` | Validate `{ roomCode, asSpectator? }`. Fetch room; emit `error_event ROOM_NOT_FOUND` if null. If `asSpectator`, call `addSpectator`; else `addPlayer`. `socket.join(\`room:${roomCode}\`)`. Broadcast `room:player_joined` to others, emit fresh `room:state` to all in the room. If now full and `status === 'waiting'`, transition to `starting` and call `gameHandlers.startGame(roomCode)`. |
-| `room:leave` | Resolve room from `socket.user._id`. Call `removePlayer` or `removeSpectator`. Emit `room:player_left` to remaining members. If game was in progress, call `gameHandlers.handleAbortOnLeave(roomCode, userId)` (forfeit logic). If room emptied → `deleteRoom`. |
+| `room:leave` | Resolve room from `socket.user._id`. Call `removePlayer` or `removeSpectator`. Emit `room:player_left` to remaining members. If game was in progress, call `gameHandlers.handleAbortOnLeave(roomCode, userId)` (forfeit logic). If room emptied -> `deleteRoom`. |
 
 **SECURITY:**
 - Server enforces `maxPlayers` from `GameFactory` — client cannot inflate the cap.
@@ -1340,8 +1398,8 @@ Spectators receive sanitized game-state updates but cannot send `game:action` or
 - `room:join` with `asSpectator: true` adds to `room.spectators`.
 - Spectator cap = 10 (enforced in `addSpectator`).
 - Spectators receive `game:state`, `game:turn`, `game:end`, `chat:message`, `room:state`.
-- `game:action` from a spectator → `error_event { code: 'NOT_A_PLAYER' }`.
-- `game:rematch_request` from a spectator → ignored.
+- `game:action` from a spectator -> `error_event { code: 'NOT_A_PLAYER' }`.
+- `game:rematch_request` from a spectator -> ignored.
 - A player can be promoted to spectator if a game ends and they choose to stay (UI calls `room:join` with `asSpectator: true` after `game:end`).
 
 **Sanitization:** the Game class's `getStateFor(userId)` (Step 17) returns a public state for spectators (e.g., card game: face-up cards visible, hands hidden).
@@ -1362,7 +1420,7 @@ Public auto-matchmaker: a player picks a `gameType`, gets queued, and is auto-pa
 |---|---|
 | `joinQueue({ user, gameType })` | Refuse if user is already in a room or already queued. `RPUSH mm:<gameType> <json>` with `{ userId, displayName, isGuest, avatarUrl, queuedAt }`. Set per-entry TTL via separate `SET mm:lock:<userId> 1 EX <ttl>`. After enqueue, call `tryMatch(gameType)`. |
 | `cancelQueue({ user, gameType })` | `LREM mm:<gameType>` matching entry. `DEL mm:lock:<userId>`. |
-| `tryMatch(gameType)` | While queue length ≥ `GameFactory.getConfig(gameType).maxPlayers`: `LPOP` that many entries, double-check each user is still online (via `mm:lock` existence + connected-socket index), create a new public room via `roomService.createRoom`, `addPlayer` for each, emit `matchmaking:matched { roomCode }` to each socket. |
+| `tryMatch(gameType)` | While queue length >= `GameFactory.getConfig(gameType).maxPlayers`: `LPOP` that many entries, double-check each user is still online (via `mm:lock` existence + connected-socket index), create a new public room via `roomService.createRoom`, `addPlayer` for each, emit `matchmaking:matched { roomCode }` to each socket. |
 | `cleanupOnDisconnect(userId)` | Remove user from any queues. |
 
 **`socket/matchmakingHandlers.ts`:**
@@ -1391,9 +1449,9 @@ Server-stamped chat with a 50-message rolling window per room.
 
 | Event | Flow |
 |---|---|
-| `chat:send` | Validate `{ message }` (1–300 chars after trim, escape HTML). Verify socket is in a room (player **or** spectator). Build `{ from: userId, displayName: socket.user.displayName, message, timestamp }`. `roomService.appendChat`. Broadcast `chat:message` to `room:<roomCode>`. |
+| `chat:send` | Validate `{ message }` (1-300 chars after trim, escape HTML). Verify socket is in a room (player **or** spectator). Build `{ from: userId, displayName: socket.user.displayName, message, timestamp }`. `roomService.appendChat`. Broadcast `chat:message` to `room:<roomCode>`. |
 
-**Per-socket throttle:** in-memory `Map<string, number>` (userId → lastMsgAt). Reject if `< 500ms` since last message; emit `error_event { code: 'CHAT_THROTTLED' }`.
+**Per-socket throttle:** in-memory `Map<string, number>` (userId -> lastMsgAt). Reject if `< 500ms` since last message; emit `error_event { code: 'CHAT_THROTTLED' }`.
 
 **SECURITY:**
 - Message length validated and `escape()` applied — no stored XSS in chat history.
@@ -1403,7 +1461,9 @@ Server-stamped chat with a 50-message rolling window per room.
 
 ---
 
-# PHASE 4 — Game Logic (Server-Side)
+# PHASE 4 — GAME LOGIC (SERVER-SIDE)
+
+---
 
 ## STEP 17 — GameFactory Pattern & Base Game Class
 
@@ -1417,7 +1477,7 @@ export type GameType = 'tictactoe' | 'cardgame';
 export type Cell = null | 'X' | 'O';
 export type TicTacToeBoard = readonly [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell];
 
-export type Suit = '♠' | '♥' | '♦' | '♣';
+export type Suit = 'spade' | 'heart' | 'diamond' | 'club';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 export type Card = { suit: Suit; rank: Rank };
 
@@ -1433,7 +1493,7 @@ export type TicTacToeState = {
 export type CardGameState = {
   gameType: 'cardgame';
   players: { userId: string; displayName: string; position: 0 | 1 | 2 | 3; handCount: number; tricksWon: number }[];
-  myHand?: Card[];                  // present only for the recipient
+  myHand?: Card[];
   currentTrick: { userId: string; card: Card }[];
   leadSuit: Suit | null;
   currentTurnUserId: string;
@@ -1460,7 +1520,7 @@ export abstract class BaseGame<TState extends GameState> {
   abstract isGameOver(): boolean;
   abstract getResult(): { result: 'win' | 'draw'; winnerId?: string } | null;
   abstract getMoveLog(): unknown[];
-  abstract serialize(): unknown;       // For Redis persistence
+  abstract serialize(): unknown;
   static deserialize(_raw: unknown): BaseGame<GameState> { throw new Error('override'); }
 }
 ```
@@ -1519,16 +1579,16 @@ Build the core move-handling logic for TicTacToe. Win detection and lifecycle (S
 **Constructor (`constructor({ players })`):**
 - Validate `players.length === 2` (else throw — caller's bug).
 - Initialize `board = Array(9).fill(null)`.
-- Assign symbols: `players[0]` → `X`, `players[1]` → `O`.
+- Assign symbols: `players[0]` -> `X`, `players[1]` -> `O`.
 - `currentTurnIndex = 0` (X plays first).
 
 **`applyAction(userId, action, payload): ActionResult`** — this step focuses on move validation only:
-- Reject if `this.result !== null` → throw `GAME_OVER`.
-- Reject if `action !== 'play'` → throw `UNKNOWN_ACTION`.
+- Reject if `this.result !== null` -> throw `GAME_OVER`.
+- Reject if `action !== 'play'` -> throw `UNKNOWN_ACTION`.
 - Validate payload shape: `typeof payload === 'object' && payload !== null && typeof (payload as any).index === 'number'`. Else throw `INVALID_PAYLOAD`.
-- Reject if `userId !== this.players[this.currentTurnIndex].userId` → throw `NOT_YOUR_TURN`.
-- Let `index = (payload as { index: number }).index`. Reject if not integer in `0..8` → `INVALID_MOVE`.
-- Reject if `this.board[index] !== null` (cell occupied) → `INVALID_MOVE`.
+- Reject if `userId !== this.players[this.currentTurnIndex].userId` -> throw `NOT_YOUR_TURN`.
+- Let `index = (payload as { index: number }).index`. Reject if not integer in `0..8` -> `INVALID_MOVE`.
+- Reject if `this.board[index] !== null` (cell occupied) -> `INVALID_MOVE`.
 - **Apply:** `this.board[index] = this.players[this.currentTurnIndex].symbol`.
 - Append to `this.moves`: `{ userId, index, symbol, t: Date.now() }`.
 - Win/draw detection happens in Step 19 (`#checkOutcome` private method).
@@ -1536,7 +1596,7 @@ Build the core move-handling logic for TicTacToe. Win detection and lifecycle (S
 - Return `{ stateChanged: true, gameOver: this.result !== null, result: this.result ?? undefined, winnerId: this.winner ?? undefined }`.
 
 **Helpers:**
-- `getCurrentPlayerId(): string` → `this.players[this.currentTurnIndex].userId`.
+- `getCurrentPlayerId(): string` -> `this.players[this.currentTurnIndex].userId`.
 
 **SECURITY:**
 - Symbol assignment is server-controlled by join order; client never sets it.
@@ -1554,9 +1614,9 @@ Add the win/draw checking and the per-viewer state serialization that completes 
 
 ```ts
 private static readonly WINNING_LINES: readonly (readonly [number, number, number])[] = [
-  [0,1,2], [3,4,5], [6,7,8],   // rows
-  [0,3,6], [1,4,7], [2,5,8],   // cols
-  [0,4,8], [2,4,6],            // diagonals
+  [0,1,2], [3,4,5], [6,7,8],
+  [0,3,6], [1,4,7], [2,5,8],
+  [0,4,8], [2,4,6],
 ];
 
 #checkOutcome(): void {
@@ -1590,8 +1650,8 @@ getStateFor(_userId: string | null): TicTacToeState {
 ```
 
 **Serialization for Redis (`serialize` / `deserialize`):**
-- `serialize(): unknown` → `{ board, players: players.map(p => ({...})), currentTurnIndex, winner, result, winningLine, moves }`.
-- `static deserialize(raw: unknown): TicTacToe` → reconstruct by validating shape, then assigning fields directly.
+- `serialize(): unknown` -> `{ board, players, currentTurnIndex, winner, result, winningLine, moves }`.
+- `static deserialize(raw: unknown): TicTacToe` -> reconstruct by validating shape, then assigning fields directly.
 
 **`getResult()`:** if `this.result !== null`, return `{ result: this.result, winnerId: this.winner ?? undefined }`. Else return `null`.
 
@@ -1619,9 +1679,9 @@ Build the deterministic, cryptographically-seeded deal logic for the 4-player ca
 **Rules summary** (encoded across this and the next two steps):
 - 52-card deck, dealt 13 to each of 4 players.
 - 13 tricks per game. Each trick: lead plays first; others must follow suit if possible; highest card of the lead suit wins the trick.
-- Player with the most tricks wins. Tie → draw.
+- Player with the most tricks wins. Tie -> draw.
 
-**`utils/shuffle.ts`** — Fisher–Yates seeded by `crypto.randomBytes` (cryptographically unpredictable):
+**`utils/shuffle.ts`** — Fisher-Yates seeded by `crypto.randomBytes` (cryptographically unpredictable):
 
 ```ts
 import { randomBytes } from 'node:crypto';
@@ -1642,7 +1702,7 @@ export const shuffle = <T>(input: readonly T[]): T[] => {
 ```ts
 import type { Card, Suit, Rank } from '@mpg/shared/types/games';
 
-const SUITS: readonly Suit[] = ['♠', '♥', '♦', '♣'];
+const SUITS: readonly Suit[] = ['spade', 'heart', 'diamond', 'club'];
 const RANKS: readonly Rank[] = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 
 export const buildDeck = (): Card[] => {
@@ -1656,9 +1716,9 @@ export const buildDeck = (): Card[] => {
 - Validate `players.length === 4` — else throw.
 - Build deck via `buildDeck()`, shuffle.
 - Slice into 4 hands of 13: `players[i].hand = shuffled.slice(i*13, i*13+13)`.
-- Sort each player's hand for stable display: by suit (`♠♥♦♣` order), then rank ascending.
-- Determine starting lead: player who has `2 of ♣` plays first (classic rule). Set `currentTurnIndex` accordingly.
-- Initialize: `currentTrick = []`, `leadSuit = null`, `tricksWon = { [userId]: 0 } × 4`, `trickNumber = 0`, `moves = []`.
+- Sort each player's hand for stable display: by suit order, then rank ascending.
+- Determine starting lead: player who has `2 of clubs` plays first (classic rule). Set `currentTurnIndex` accordingly.
+- Initialize: `currentTrick = []`, `leadSuit = null`, `tricksWon = { [userId]: 0 } x 4`, `trickNumber = 0`, `moves = []`.
 
 **Internal state fields:**
 
@@ -1687,15 +1747,15 @@ export const buildDeck = (): Card[] => {
 Implement `applyAction` for card plays with strict server-side enforcement of "must follow suit".
 
 **`applyAction(userId, action, payload): ActionResult`:**
-- Reject if `this.result !== null` → throw `GAME_OVER`.
-- Reject if `action !== 'play_card'` → throw `UNKNOWN_ACTION`.
+- Reject if `this.result !== null` -> throw `GAME_OVER`.
+- Reject if `action !== 'play_card'` -> throw `UNKNOWN_ACTION`.
 - Validate payload shape: must be `{ card: { suit: Suit; rank: Rank } }`. Throw `INVALID_PAYLOAD` otherwise.
-- Reject if `userId !== this.players[this.currentTurnIndex].userId` → throw `NOT_YOUR_TURN`.
+- Reject if `userId !== this.players[this.currentTurnIndex].userId` -> throw `NOT_YOUR_TURN`.
 - Find the player: `const player = this.players[this.currentTurnIndex]`.
 - Verify card is in `player.hand`: search by exact `suit + rank` match. Throw `INVALID_CARD` if missing.
 - **Follow-suit enforcement:** if `this.currentTrick.length > 0` and `this.leadSuit !== null`:
   - Compute `hasLeadSuit = player.hand.some(c => c.suit === this.leadSuit)`.
-  - If `hasLeadSuit && card.suit !== this.leadSuit` → throw `MUST_FOLLOW_SUIT`.
+  - If `hasLeadSuit && card.suit !== this.leadSuit` -> throw `MUST_FOLLOW_SUIT`.
 - **Apply move:**
   - Remove card from `player.hand` (in place).
   - Push `{ userId, card }` to `this.currentTrick`.
@@ -1704,7 +1764,7 @@ Implement `applyAction` for card plays with strict server-side enforcement of "m
 - **Trick complete?** If `this.currentTrick.length === 4`, hand off to `#resolveTrick()` (Step 22). Otherwise, advance turn: `this.currentTurnIndex = ((this.currentTurnIndex + 1) % 4) as 0|1|2|3`.
 - Return `{ stateChanged: true, gameOver: this.result !== null }`.
 
-**`getCurrentPlayerId(): string`** → `this.players[this.currentTurnIndex].userId`.
+**`getCurrentPlayerId(): string`** -> `this.players[this.currentTurnIndex].userId`.
 
 **`getStateFor(viewerUserId: string | null): CardGameState`** — strict per-viewer filtering:
 
@@ -1759,15 +1819,11 @@ private static readonly RANK_ORDER: Record<Rank, number> = {
   const winningEntry = followingLeadSuit.reduce((best, cur) =>
     CardGame.RANK_ORDER[cur.card.rank] > CardGame.RANK_ORDER[best.card.rank] ? cur : best
   );
-  // Update score
   this.tricksWon[winningEntry.userId] = (this.tricksWon[winningEntry.userId] ?? 0) + 1;
-  // Winner leads next trick
   this.currentTurnIndex = this.players.findIndex((p) => p.userId === winningEntry.userId) as 0|1|2|3;
-  // Reset trick state
   this.currentTrick = [];
   this.leadSuit = null;
   this.trickNumber += 1;
-  // Game over after 13 tricks?
   if (this.trickNumber >= 13) this.#finalize();
 }
 
@@ -1795,8 +1851,8 @@ isGameOver(): boolean { return this.result !== null; }
 ```
 
 **Serialization (`serialize` / `deserialize`):**
-- `serialize()` → `{ players, currentTrick, leadSuit, currentTurnIndex, tricksWon, trickNumber, result, winner, moves }`.
-- `static deserialize(raw)` → validate top-level shape, reconstruct hands as `Card[]`, restore counts/state.
+- `serialize()` -> `{ players, currentTrick, leadSuit, currentTurnIndex, tricksWon, trickNumber, result, winner, moves }`.
+- `static deserialize(raw)` -> validate top-level shape, reconstruct hands as `Card[]`, restore counts/state.
 - Critical: `deserialize` runs after every Redis read; if shape is invalid (e.g., from a code-version mismatch), throw and let the handler emit `error_event`.
 
 **`getMoveLog()`:** returns `this.moves` for `matchService.recordMatch`. The full move log lets admins replay any past game.
@@ -1865,7 +1921,9 @@ Use Socket.io's built-in retry with a server-side grace period before forfeiting
 
 ---
 
-# PHASE 5 — Backend Validation, Security & Logging
+# PHASE 5 — BACKEND VALIDATION, SECURITY & LOGGING
+
+---
 
 ## STEP 25 — REST Validators (express-validator chains)
 
@@ -1875,8 +1933,8 @@ Wire `express-validator` rules to every REST endpoint. Each validator file expor
 
 | File | Validators |
 |---|---|
-| `authValidators.ts` | `registerValidator` (username regex `^[a-z0-9_]+$` 3–20, email `isEmail` + `normalizeEmail`, password min 8 + complexity, displayName 2–30 trim+escape), `loginValidator`, `guestLoginValidator` (displayName 3–20 + escape), `changePasswordValidator`, `deleteAccountValidator` |
-| `userValidators.ts` | `updateProfileValidator` (displayName, bio escape ≤200, avatarUrl URL), `preferencesValidator` (each key checked against enum/boolean — see below), `usernameParamValidator`, `paginationValidator` |
+| `authValidators.ts` | `registerValidator` (username regex `^[a-z0-9_]+$` 3-20, email `isEmail` + `normalizeEmail`, password min 8 + complexity, displayName 2-30 trim+escape), `loginValidator`, `guestLoginValidator` (displayName 3-20 + escape), `changePasswordValidator`, `deleteAccountValidator` |
+| `userValidators.ts` | `updateProfileValidator` (displayName, bio escape <=200, avatarUrl URL), `preferencesValidator` (each key checked against enum/boolean — see below), `usernameParamValidator`, `paginationValidator` |
 | `matchValidators.ts` | `uuidParamValidator` (`isUUID(4)`), `gameTypeFilterValidator` (`isIn(['tictactoe','cardgame'])`) |
 | `adminValidators.ts` | `updateRoleValidator` (role enum), `userIdParamValidator`, `userSearchValidator` (escape + regex-escape via `customSanitizer`) |
 
@@ -1946,11 +2004,11 @@ export const validateRoomCreatePayload = (raw: unknown): ValidatorResult<{ gameT
 
 | Validator | Rule |
 |---|---|
-| `validateRoomCreatePayload` | `gameType ∈ ['tictactoe','cardgame']`, `isPrivate: boolean` |
+| `validateRoomCreatePayload` | `gameType` in `['tictactoe','cardgame']`, `isPrivate: boolean` |
 | `validateRoomJoinPayload` | `roomCode` matches `/^[a-f0-9]{8}$/`, `asSpectator` boolean optional |
-| `validateChatPayload` | `message` string, length 1–300 after trim, escape HTML chars (use a tiny `escapeHtml` util — no external lib needed) |
+| `validateChatPayload` | `message` string, length 1-300 after trim, escape HTML chars |
 | `validateGameActionPayload` | `action` non-empty string, `payload` object — per-game shape checked inside the game class's `applyAction` |
-| `validateMatchmakingJoin` | `gameType ∈ allowed list` |
+| `validateMatchmakingJoin` | `gameType` in allowed list |
 
 **Handler usage pattern:**
 
@@ -1958,12 +2016,11 @@ export const validateRoomCreatePayload = (raw: unknown): ValidatorResult<{ gameT
 socket.on('room:create', (raw: unknown) => {
   const v = validateRoomCreatePayload(raw);
   if (!v.ok) return socket.emit('error_event', { code: v.code, message: v.message });
-  // From here, v.value is fully typed.
   void roomService.createRoom({ host: socket.data.user, ...v.value });
 });
 ```
 
-**`utils/escapeHtml.ts`** — minimal HTML entity escaper (no `escape-html` dep needed):
+**`utils/escapeHtml.ts`** — minimal HTML entity escaper:
 
 ```ts
 const ENTITIES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -1981,53 +2038,37 @@ export const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => E
 
 ## STEP 27 — Comprehensive Security Audit Checklist
 
-- [x] Mass assignment: every controller (auth `register`, `updateProfile`, admin `updateUserRole`) destructures only allowed fields; no `req.body` spread into models.
-- [x] Role protection: `role` is **not** settable via `register`, `updateProfile`, or any non-admin endpoint. Only `adminController.updateUserRole` can change it.
-- [x] User enumeration: identical error message ("Invalid email or password") for wrong email vs. wrong password.
-- [x] Password security: hashed with bcrypt (rounds 12), `select: false`, never returned in any response, change requires current password, deletion requires password confirmation.
-- [x] JWT: secret length ≥ 32 chars enforced at startup in production. Tokens accepted only from `Authorization: Bearer` header (REST) or `socket.handshake.auth.token` (sockets). Guest tokens TTL ≤ 2 hours.
-- [x] Rate limiters: separate instances for global, auth, admin, upload — wired in Step 2.
+- [x] Mass assignment: every controller destructures only allowed fields; no `req.body` spread into models.
+- [x] Role protection: `role` is **not** settable via any non-admin endpoint.
+- [x] User enumeration: identical error message for wrong email vs. wrong password.
+- [x] Password security: hashed with bcrypt (rounds 12), never returned in any response, change requires current password.
+- [x] JWT: secret length >= 32 chars enforced at startup in production. Guest tokens TTL <= 2 hours.
+- [x] Rate limiters: separate instances for global, auth, admin, upload.
 - [x] Helmet: enabled with default safe headers.
-- [x] CORS: strict specific origin from `CLIENT_ORIGIN`; never `*` in production. Same origin enforced for Socket.io.
-- [x] Body size limits: `express.json({ limit: '10kb' })` and `express.urlencoded({ limit: '10kb' })`. Socket.io `maxHttpBufferSize: 1e5`.
-- [x] SQL injection: Drizzle + `postgres-js` parameterized queries used everywhere. **Zero** raw string interpolation of user input into `sql`` template literals — only `${variable}` (parameterized) is allowed.
-- [x] Prototype-pollution: `sanitizeMiddleware` strips `__proto__`/`constructor`/`prototype` keys and clamps object depth.
-- [x] Express 5 compatibility: no code assigns to `req.query`. `hpp` and `express-mongo-sanitize` are **not** installed.
-- [x] XSS: `escape()` applied via express-validator on all user text (displayName, bio, chat, search queries).
-- [x] ReDoS: `escapeRegex` used on every regex-based user search (admin search, public profile lookup).
-- [x] Ownership checks: `room:leave`, `game:action`, `game:rematch_request` verify `socket.user._id` is a current player.
-- [x] Spectator restrictions: spectators rejected on `game:action`/`game:rematch_request`; their `getStateFor(null)` view hides hidden info (card hands).
+- [x] CORS: strict specific origin; never `*` in production.
+- [x] Body size limits: `express.json({ limit: '10kb' })`. Socket.io `maxHttpBufferSize: 1e5`.
+- [x] SQL injection: Drizzle + `postgres-js` parameterized queries. Zero raw string interpolation.
+- [x] Prototype-pollution: `sanitizeMiddleware` strips `__proto__`/`constructor`/`prototype` keys.
+- [x] Express 5 compatibility: no code assigns to `req.query`.
+- [x] XSS: `escape()` applied via express-validator on all user text.
+- [x] ReDoS: `escapeRegex` used on every regex-based user search.
+- [x] Ownership checks: `game:action` verifies `socket.user._id` is a current player.
+- [x] Spectator restrictions: spectators rejected on `game:action`; `getStateFor(null)` hides hidden info.
 - [x] Admin self-protection: cannot delete self, cannot change own role, last-admin guarded.
-- [x] Pagination clamp: `limit ≤ 100` (leaderboard), `≤ 50` (matches/users); page coerced to positive integer.
-- [x] File upload: MIME whitelist (`image/jpeg`, `image/png`, `image/webp`), 5 MB cap, server-generated filenames.
-- [x] Cascade rules: deleting a user nulls `Match.players.userId` but preserves displayName.
-- [x] Error handler: never exposes stack traces or internal paths in production.
+- [x] Pagination clamp: `limit <= 100` (leaderboard), `<= 50` (matches/users).
+- [x] File upload: MIME whitelist, 5 MB cap, server-generated filenames.
+- [x] Error handler: never exposes stack traces in production.
 - [x] Privacy: `preferences.privacy.showStats` and `showOnLeaderboard` enforced server-side.
 - [x] x-powered-by disabled.
-- [x] `.env.example` synced with all required keys; no real secrets.
+- [x] `.env.example` synced; no real secrets.
 - [x] No `console.log` of tokens, hashes, or PII in production code.
-- [x] Token storage: client uses `localStorage` only; never written to non-secure cookies.
-- [x] Drizzle: schema is the single source of truth (no parallel `interface` drift). `password` column never selected by default — public reads use `usersPublicSelect` projection.
-- [x] Migrations: every schema change has a generated `drizzle/NNNN_*.sql` file committed. Never hand-edit production-applied migrations.
-- [x] Postgres error codes (`23505` unique violation, `23503` FK violation, `23502` not-null) are mapped to friendly generic messages in `errorHandler` — raw codes/columns never leak.
-- [x] Connection pool capped (`max: 10` prod, `max: 5` dev) to stay under Neon free-tier limits.
-- [x] TypeScript strict: `tsconfig.base.json` has `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`. No `any` anywhere except in third-party type shims.
-- [x] Shared types: every wire-crossing payload (Socket.io events, REST responses, JWT claims) sourced from `shared/types/*.ts` — no duplicate type definitions on client and server.
-- [x] Socket.io typed: `Server<ClientToServerEvents, ServerToClientEvents, ..., SocketData>` used on both server and client; payload typos caught at compile time.
-- [x] Socket.io: every `io.on('connection')` is gated by `authSocket`; no unauthenticated connections allowed.
-- [x] Game logic: all rules (turn, validity, winner detection, hand visibility) computed server-side; client `payload` shape validated before reaching the game class.
-- [x] Room TTL: every `room:*` and `user:room:*` key created with `EX <ROOM_TTL_SECONDS>`; abandoned rooms self-clean.
-- [x] Chat throttle: 500 ms per-user; chat history bounded at 50 messages.
+- [x] Typed sockets: `Server<ClientToServerEvents, ServerToClientEvents>` ensures payload safety at compile time.
 
 ---
 
 ## STEP 28 — Logging & Observability (pino + structured logs)
 
 Replace ad-hoc `console.log` with a structured logger so production logs are queryable, redact secrets, and integrate cleanly with Render/Sentry.
-
-**Why pino:** fastest Node logger, JSON output by default, native child-logger pattern, redaction support, near-zero overhead in production.
-
-**Install:** `pino` (prod), `pino-pretty` (dev).
 
 **`utils/logger.ts`:**
 
@@ -2056,47 +2097,29 @@ export const childLogger = (bindings: Record<string, unknown>) => logger.child(b
 
 | Where | Pattern |
 |---|---|
-| HTTP request log | `pino-http` middleware mounted just after helmet/cors. Auto-logs method, url, status, responseTime, requestId. |
-| Socket events | `socket.data.logger = childLogger({ socketId: socket.id, userId: socket.data.user._id })` in `authSocket.ts`. Each handler uses `socket.data.logger.info({ event: 'room:create', payload }, 'Creating room')`. |
-| Errors | `errorHandler.ts` calls `logger.error({ err, req }, 'Unhandled error')` then sends sanitized response. |
+| HTTP request log | `pino-http` middleware mounted just after helmet/cors. |
+| Socket events | `socket.data.logger = childLogger({ socketId, userId })`. |
+| Errors | `logger.error({ err, req }, 'Unhandled error')`. |
 | Game lifecycle | `logger.info({ roomCode, gameType, players: players.length }, 'Game started')`. |
 | Match record | `logger.info({ matchId, result, durationMs }, 'Match recorded')`. |
 | Disconnects | `logger.warn({ userId, roomCode, reason }, 'Disconnect')`. |
 
-**Env additions:**
-
-| Variable | Default | Notes |
-|---|---|---|
-| `LOG_LEVEL` | `info` (prod) / `debug` (dev) | `trace`/`debug`/`info`/`warn`/`error`/`fatal` |
-
-**Render log management:**
-- Render captures stdout/stderr; pino's JSON output is automatically structured.
-- Optional: forward to Logtail/Better Stack via `pino-logtail` for searchable log retention beyond Render's free-tier window.
-
-**Optional Sentry integration** (mentioned in Step 55):
-- `@sentry/node` SDK initialized in `server.ts` before any other middleware.
-- `app.use(Sentry.Handlers.requestHandler())` first, `app.use(Sentry.Handlers.errorHandler())` before `errorHandler`.
-- DSN from `SENTRY_DSN` env var (optional — if unset, Sentry is no-op).
-
-**Audit hardening:** the `redact.paths` config above is critical — without it, a logged request containing a password field would land in production logs. Verify `password`, `token`, and `authorization` never appear in logs.
-
 **SECURITY:**
-- Redaction is enforced at the logger level — even if a developer accidentally logs `req.body`, passwords are stripped before serialization.
+- Redaction is enforced at the logger level — even if a developer accidentally logs `req.body`, passwords are stripped.
 - No PII (email, IP) in info-level logs by default; only in debug.
-- Stack traces logged server-side only; never sent to client (Step 27 audit item).
-- Sentry DSN is read from env, never hardcoded.
+- Stack traces logged server-side only; never sent to client.
 
 ---
 
-# PHASE 6 — Backend Testing
+# PHASE 6 — BACKEND TESTING
+
+---
 
 ## STEP 29 — Unit Tests (Game Logic, Utils, Validators)
 
 Lock down the most-changed and highest-leverage logic with fast unit tests. **No I/O** — pure function tests run in milliseconds.
 
 **Tooling:** `vitest` (faster than Jest, ESM-native, TS out-of-the-box).
-
-**Install (server dev deps):** `vitest`, `@vitest/coverage-v8`.
 
 **`server/vitest.config.ts`:**
 
@@ -2120,26 +2143,17 @@ export default defineConfig({
 
 | File | Coverage |
 |---|---|
-| `games/__tests__/TicTacToe.test.ts` | Move validation (occupied cell, off-turn, out of range), all 8 winning lines, draw detection, `getStateFor` returns identical shape for spectator and players (no hidden info) |
-| `games/__tests__/CardGame.test.ts` | Deal: each player gets 13 unique cards, deck has no duplicates after deal. Play: must-follow-suit enforcement, off-suit allowed when player has no lead suit, trick winner is highest of lead suit. End: 13 tricks → score → winner. `getStateFor(userId)` hides other hands. |
-| `games/__tests__/GameFactory.test.ts` | `create('tictactoe', ...)` returns `TicTacToe`, `create('cardgame', ...)` returns `CardGame`, unknown type throws. `getConfig` correct per game. |
-| `utils/__tests__/escapeRegex.test.ts` | All regex special chars escaped, normal strings untouched |
+| `games/__tests__/TicTacToe.test.ts` | Move validation, all 8 winning lines, draw detection, `getStateFor` |
+| `games/__tests__/CardGame.test.ts` | Deal distribution, must-follow-suit enforcement, trick winner, final scoring, `getStateFor(userId)` hides other hands |
+| `games/__tests__/GameFactory.test.ts` | `create` returns correct class, unknown type throws, `getConfig` correct per game |
+| `utils/__tests__/escapeRegex.test.ts` | All regex special chars escaped |
 | `utils/__tests__/escapeHtml.test.ts` | All HTML entities replaced |
-| `utils/__tests__/shuffle.test.ts` | Returned array same length and elements as input, order varies across calls (statistical) |
+| `utils/__tests__/shuffle.test.ts` | Same length/elements, order varies |
 | `utils/__tests__/generateRoomCode.test.ts` | Returns 8-hex-char string, no collisions across 10k iterations |
-| `validators/__tests__/socketValidators.test.ts` | Each validator: valid input returns `ok: true`, invalid returns `ok: false` with expected code |
-| `services/__tests__/roomService.test.ts` | Mock ioredis with `ioredis-mock`. Test `createRoom`/`addPlayer` capacity, `removePlayer` host transfer, `deleteRoom` cleanup |
+| `validators/__tests__/socketValidators.test.ts` | Each validator: valid -> `ok: true`, invalid -> `ok: false` with expected code |
+| `services/__tests__/roomService.test.ts` | Mock ioredis. Test capacity, host transfer, cleanup |
 
-**Test fixtures (`src/__fixtures__/`):**
-
-```
-__fixtures__/
-├── players.ts       # Mock RoomPlayer arrays for 2P and 4P games
-├── tokens.ts        # Pre-signed JWT tokens for valid/expired/guest cases
-└── matches.ts       # Sample MatchRecord shapes
-```
-
-**Coverage gate:** ≥ 85% on `games/`, `utils/`, `validators/`. Lower thresholds OK on `controllers/`/`services/` (covered by integration tests).
+**Coverage gate:** >= 85% on `games/`, `utils/`, `validators/`.
 
 **npm scripts (`server/package.json`):**
 
@@ -2150,52 +2164,35 @@ __fixtures__/
 | `test:coverage` | `vitest run --coverage` |
 | `test:watch` | `vitest --watch` |
 
-**SECURITY:**
-- Tests use deterministic seeds for shuffles (override `crypto.randomBytes` with a fixed buffer in test setup) so card-game test outcomes are reproducible.
-- Tests **never** import production secrets; JWT fixtures are signed with a test-only secret declared in `vitest.setup.ts`.
-- No real Redis or Postgres connection in unit tests — only in-memory mocks. Drizzle queries are not exercised in unit tests; `services/userService` and `services/matchService` are tested via integration tests (Step 30) where they hit a real ephemeral Postgres instance.
-
 ---
 
 ## STEP 30 — Integration Tests (REST + Socket.io flows)
 
 End-to-end tests that exercise the real Express app and a real Socket.io server, against ephemeral test instances of Postgres and Redis.
 
-**Tooling:** `vitest`, `supertest` (REST), `socket.io-client` (sockets), `@testcontainers/postgresql` (or a CI-provided service container — see Step 53), `ioredis-mock`.
+**Tooling:** `vitest`, `supertest` (REST), `socket.io-client` (sockets), `@testcontainers/postgresql`, `ioredis-mock`.
 
 **Test infrastructure (`src/__tests__/setup.integration.ts`):**
 
-- `beforeAll`: start a Testcontainers Postgres instance (`new PostgreSqlContainer('postgres:16-alpine').start()`), set `DATABASE_URL` to its connection URL, run `migrate(...)` once to apply all migration files, set `REDIS_URL` to `ioredis-mock://`, start the app on a random port via `app.listen(0)`, attach Socket.io.
-- `afterEach`: `TRUNCATE matches, users RESTART IDENTITY CASCADE` for fast reset (faster than `DROP TABLE` + re-migrate); `redis.flushall()`.
-- `afterAll`: close server, `await dbClient.end()`, stop Postgres container.
-
-> **CI fast path:** GitHub Actions provides a `services: postgres` container (Step 53). In CI, skip Testcontainers and connect directly to that service — saves ~10 s per test run.
+- `beforeAll`: start a Testcontainers Postgres instance, set `DATABASE_URL`, run `migrate(...)`, set `REDIS_URL` to `ioredis-mock://`, start the app on a random port, attach Socket.io.
+- `afterEach`: `TRUNCATE matches, users RESTART IDENTITY CASCADE`; `redis.flushall()`.
+- `afterAll`: close server, stop Postgres container.
 
 **Test files:**
 
 | File | Flow tested |
 |---|---|
-| `__tests__/auth.integration.test.ts` | Register → login → getMe → updateProfile → changePassword → deleteAccount end-to-end. Negative: duplicate username, wrong password, role escalation attempt |
-| `__tests__/guest.integration.test.ts` | `loginAsGuest` returns valid token; guest cannot access `/api/users/me`; guest can connect socket and join a room |
-| `__tests__/room.integration.test.ts` | Two clients connect with different JWTs → client A creates room → client B joins → both receive `room:state` → second join into a full room rejected |
-| `__tests__/tictactoe.integration.test.ts` | Full game: 2 players connect, room created, game starts, alternating valid moves, server emits state after each, opponent receives `game:turn`, win is detected, `game:end` fires, Postgres `matches` table has new row, both players' jsonb `stats.wins`/`stats.gamesPlayed` incremented |
-| `__tests__/cardgame.integration.test.ts` | 4 players connect, room fills, game starts, hand-counts correct, must-follow-suit enforced (off-suit move rejected), trick resolution rotates lead, final scoring matches manually computed expected |
-| `__tests__/spectator.integration.test.ts` | Spectator joins, receives `game:state` without `myHand`, `game:action` from spectator returns `error_event` |
-| `__tests__/matchmaking.integration.test.ts` | 2 clients queue for tictactoe → both receive `matchmaking:matched` with same roomCode → join the room → game starts |
-| `__tests__/chat.integration.test.ts` | Message broadcast, 300-char limit, throttle (second message within 500ms rejected), 50-msg history cap |
-| `__tests__/disconnect.integration.test.ts` | Client A disconnects mid-game → other player sees `room:state` with `isConnected: false` → A reconnects within grace → state resumes. A doesn't reconnect → after grace, opponent receives `game:end` with forfeit |
-| `__tests__/admin.integration.test.ts` | Admin token required for `/api/admin/*`. Self-protection: admin cannot delete self. Last-admin: cannot demote the only admin |
-| `__tests__/security.integration.test.ts` | SQL-injection-style payload (`'; DROP TABLE users;--`) treated as plain string by Drizzle parameterized queries (no error, no leak); XSS payload escaped; oversized body rejected (10 KB limit); prototype-pollution attempt (`{ "__proto__": { "polluted": true } }`) stripped by sanitizeMiddleware; no `x-powered-by` header; helmet headers present; role escalation via `PUT /api/auth/me` body fails silently |
-
-**Helper: `createTestClient` factory:**
-
-```ts
-export const createTestClient = async (user: { isGuest?: boolean; role?: 'player' | 'admin' } = {}): Promise<{ httpAgent: SuperAgentTest; socket: ClientSocket; token: string }> => {
-  // Register a fresh user (or generate guest token), return supertest agent + connected socket
-};
-```
-
-**Coverage target:** every Socket.io event has at least one happy-path and one rejection-path integration test.
+| `auth.integration.test.ts` | Register -> login -> getMe -> updateProfile -> changePassword -> deleteAccount. Negative: duplicate username, wrong password, role escalation |
+| `guest.integration.test.ts` | `loginAsGuest` returns valid token; guest cannot access `/api/users/me`; guest can connect socket and join a room |
+| `room.integration.test.ts` | Two clients connect -> create room -> join -> both receive `room:state` -> full room rejection |
+| `tictactoe.integration.test.ts` | Full game: connect, room, alternating moves, win detected, match recorded, stats incremented |
+| `cardgame.integration.test.ts` | 4 players connect, must-follow-suit enforced, trick resolution, final scoring |
+| `spectator.integration.test.ts` | Spectator receives `game:state` without `myHand`, `game:action` rejected |
+| `matchmaking.integration.test.ts` | 2 clients queue -> both receive `matchmaking:matched` -> game starts |
+| `chat.integration.test.ts` | Message broadcast, 300-char limit, throttle, 50-msg cap |
+| `disconnect.integration.test.ts` | Disconnect mid-game -> reconnect within grace -> resume. No reconnect -> forfeit |
+| `admin.integration.test.ts` | Admin token required. Self-protection. Last-admin guard |
+| `security.integration.test.ts` | SQL injection treated as plain string, XSS escaped, oversized body rejected, prototype-pollution stripped, helmet headers present, role escalation fails silently |
 
 **npm scripts:**
 
@@ -2204,14 +2201,11 @@ export const createTestClient = async (user: { isGuest?: boolean; role?: 'player
 | `test:integration` | `vitest run --config vitest.integration.config.ts` |
 | `test:all` | `npm run test:run && npm run test:integration` |
 
-**SECURITY:**
-- Integration tests assert security guarantees (NoSQL injection, XSS, role escalation) — not just functionality.
-- Tests use fresh in-memory Mongo/Redis per run, eliminating test-pollution.
-- No production-style Redis or Mongo URLs in test config; URLs are constructed at runtime.
-
 ---
 
-# PHASE 7 — Client Foundation
+# PHASE 7 — CLIENT FOUNDATION
+
+---
 
 ## STEP 31 — Client Setup: Vite, Tailwind, Axios, Socket.io-client
 
@@ -2332,7 +2326,7 @@ export const getSocket = (): AppSocket | null => socket;
 export const disconnectSocket = (): void => { socket?.disconnect(); socket = null; };
 ```
 
-**`src/hooks/useSocketEvent.ts`** — generic over event names so the handler param is auto-inferred:
+**`src/hooks/useSocketEvent.ts`** — generic over event names:
 
 ```ts
 import { useEffect } from 'react';
@@ -2352,13 +2346,6 @@ export const useSocketEvent = <K extends keyof ServerToClientEvents>(
 };
 ```
 
-**`.env.example` (client):**
-
-```
-VITE_API_URL=http://localhost:5000/api
-VITE_SOCKET_URL=http://localhost:5000
-```
-
 **SECURITY:**
 - Token stored in `localStorage` only — never in non-`httpOnly` cookies.
 - 401 interceptor clears token and redirects, preventing stale-token usage.
@@ -2368,7 +2355,7 @@ VITE_SOCKET_URL=http://localhost:5000
 
 ## STEP 32 — Reusable UI Kit (Button, Input, Modal, Spinner, Card, Badge)
 
-Build the design-system primitives once, then use them across every page. This step **must** come before any page implementation so pages compose primitives instead of duplicating styles.
+Build the design-system primitives once, then use them across every page.
 
 **File layout — `client/src/components/ui/`:**
 
@@ -2386,7 +2373,7 @@ ui/
 ├── Spinner.tsx         # Sizes: sm/md/lg, optional center prop
 ├── Skeleton.tsx        # Loading placeholder (rectangular, circular)
 ├── Badge.tsx           # Status colors (default, success, warning, danger, info)
-├── StatusBadge.tsx     # Composed: maps room status → Badge variant + icon
+├── StatusBadge.tsx     # Composed: maps room status -> Badge variant + icon
 ├── RoleBadge.tsx       # Composed: player vs admin
 ├── Card.tsx            # Surface container with consistent padding/border
 ├── Avatar.tsx          # Image or initials fallback, sizes: xs/sm/md/lg
@@ -2397,39 +2384,6 @@ ui/
 └── index.ts            # Re-export all
 ```
 
-**Common props pattern** — every component extends native HTML props plus typed variants:
-
-```tsx
-// Example: Button.tsx
-import { type ButtonHTMLAttributes, forwardRef } from 'react';
-
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size = 'sm' | 'md' | 'lg';
-
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: Variant;
-  size?: Size;
-  isLoading?: boolean;
-  leftIcon?: ReactNode;
-};
-
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', isLoading, leftIcon, children, className, disabled, ...rest }, ref) => {
-    return (
-      <button
-        ref={ref}
-        disabled={disabled || isLoading}
-        className={cn(buttonVariants({ variant, size }), className)}
-        {...rest}
-      >
-        {isLoading ? <Spinner size="sm" /> : leftIcon}
-        {children}
-      </button>
-    );
-  }
-);
-```
-
 **`utils/cn.ts`** — tiny `clsx`-style class merger (no dependency):
 
 ```ts
@@ -2437,49 +2391,25 @@ export const cn = (...classes: (string | false | null | undefined)[]): string =>
   classes.filter(Boolean).join(' ');
 ```
 
-**Modal focus management (`Modal.tsx`):**
-- On open: stash the previously focused element, focus the modal's first focusable.
-- On close: restore focus to the stashed element.
-- Trap Tab/Shift+Tab cycling within the modal.
-- Escape key closes (configurable via `closeOnEscape` prop, default true).
-- Backdrop click closes (configurable via `closeOnBackdropClick`, default true).
-- `role="dialog"`, `aria-modal="true"`, `aria-labelledby` linked to title id.
-
-**Tailwind variants helper** — keep variant→class mapping in pure objects (not class-variance-authority dep — too heavy):
-
-```ts
-const buttonVariants = ({ variant, size }: { variant: Variant; size: Size }): string => {
-  const variants: Record<Variant, string> = {
-    primary:   'bg-primary text-white hover:bg-primary/90',
-    secondary: 'bg-surface text-fg hover:bg-surface/80 border border-border',
-    ghost:     'bg-transparent text-fg hover:bg-surface/50',
-    danger:    'bg-danger text-white hover:bg-danger/90',
-  };
-  const sizes: Record<Size, string> = { sm: 'h-8 px-3 text-sm', md: 'h-10 px-4', lg: 'h-12 px-6 text-lg' };
-  return cn('inline-flex items-center gap-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary', variants[variant], sizes[size]);
-};
-```
+**Modal focus management:** On open: stash previously focused element, focus modal's first focusable. On close: restore focus. Trap Tab/Shift+Tab. Escape key closes. `role="dialog"`, `aria-modal="true"`, `aria-labelledby` linked to title id.
 
 **SECURITY:**
-- Inputs forward all native HTML props — including `autoComplete`, `inputMode`, `type` — so callers can specify `type="password"` and `autoComplete="new-password"` without UI Kit overrides.
-- Modals always render via React portal into `document.body` to avoid being clipped by parent `overflow:hidden`; this also prevents accidental capture of focus by parent containers.
 - No component uses `dangerouslySetInnerHTML`. Text content is JSX-escaped by default.
+- Modals render via React portal into `document.body`.
 
 ---
 
 ## STEP 33 — Contexts: Auth, Socket, Preferences
 
-**`AuthContext.tsx`** typed state: `{ user: AuthUser | null; token: string | null; loading: boolean }`. Methods: `login`, `register`, `loginAsGuest`, `logout`, `updateUser`, `isAdmin(): boolean`, `isGuest(): boolean`. On mount: read token from `localStorage`; if present, call `getMe` (skip for guests — decode token client-side to recover `displayName`/`isGuest`/`role`). Decoding uses a tiny no-deps base64 JSON decoder typed against `JwtPayload`; signature verification stays on the server.
+**`AuthContext.tsx`** typed state: `{ user: AuthUser | null; token: string | null; loading: boolean }`. Methods: `login`, `register`, `loginAsGuest`, `logout`, `updateUser`, `isAdmin(): boolean`, `isGuest(): boolean`. On mount: read token from `localStorage`; if present, call `getMe` (skip for guests — decode token client-side to recover claims).
 
-**`SocketContext.tsx`** typed state: `{ socket: AppSocket | null; isConnected: boolean }`. On `AuthContext.token` change, call `connectSocket(token)` if present, else `disconnectSocket()`. Track `connect`/`disconnect`/`connect_error` events to flip `isConnected`. Expose `emit<K extends keyof ClientToServerEvents>(event: K, ...args: Parameters<ClientToServerEvents[K]>)` helper backed by the singleton.
+**`SocketContext.tsx`** typed state: `{ socket: AppSocket | null; isConnected: boolean }`. On `AuthContext.token` change, call `connectSocket(token)` if present, else `disconnectSocket()`. Track `connect`/`disconnect`/`connect_error` events.
 
-**`PreferencesContext.tsx`** typed state: `{ preferences: UserPreferences }` (from `shared/types/user.ts`). For registered users, hydrate from `getMe` and persist via `updatePreferences`. For guests, persist to `localStorage`. Apply theme (`light`/`dark`/`system` with `matchMedia` listener), font size class on `<html>`, animations toggle (CSS variable), sounds toggle (read by `useSounds`).
-
-**`hooks/useSounds.ts`** — typed `play(name: 'turn' | 'win' | 'lose' | 'click'): void`. Preloads `/sounds/turn.mp3`, `/sounds/win.mp3`, `/sounds/lose.mp3`, `/sounds/click.mp3`. No-op if `preferences.sounds === false`.
+**`PreferencesContext.tsx`** typed state: `{ preferences: UserPreferences }`. For registered users, hydrate from `getMe` and persist via `updatePreferences`. For guests, persist to `localStorage`. Apply theme, font size, animations toggle, sounds toggle.
 
 **SECURITY:**
 - Client-side JWT decode is purely informational; the server still verifies on every request.
-- Preferences for guests live only in `localStorage` (no backend write path) — eliminates any guest-write attack surface.
+- Guest preferences live only in `localStorage` — no backend write path.
 
 ---
 
@@ -2490,23 +2420,17 @@ const buttonVariants = ({ variant, size }: { variant: Variant; size: Size }): st
 | Component | Composition |
 |---|---|
 | `MainLayout` | `<Navbar /> <Outlet /> <Footer />` |
-| `AdminLayout` | sidebar (Dashboard, Users, Active Rooms, Matches) + `<Outlet />`. Mobile collapse to a top dropdown. |
-| `SettingsLayout` | side nav (Profile, Account, Appearance, Notifications) + `<Outlet />`. Mobile dropdown. |
+| `AdminLayout` | sidebar + `<Outlet />`. Mobile collapse. |
+| `SettingsLayout` | side nav + `<Outlet />`. Mobile dropdown. |
 
-**Navbar elements:**
-- Logo → `/`.
-- Links: Home, Leaderboard.
-- Right: if logged in → avatar + display name + dropdown (My Profile, Settings, Admin (if admin), Logout). If logged out → Login, Register, Play as Guest.
-- Mobile hamburger.
-
-**Route guards (`components/guards/`):**
+**Route guards:**
 
 | Guard | Behavior |
 |---|---|
 | `ProtectedRoute` | Wait for `loading=false`; if no `user`, redirect `/login`. |
-| `AdminRoute` | `ProtectedRoute` + `user.role === 'admin' && !user.isGuest`, else redirect `/`. |
-| `GuestOnlyRoute` | If `user`, redirect `/` (used on `/login`, `/register`, `/guest`). |
-| `RegisteredOnlyRoute` | `ProtectedRoute` + `user && !user.isGuest`, else redirect `/` (settings, profile edit). |
+| `AdminRoute` | `ProtectedRoute` + `user.role === 'admin' && !user.isGuest`. |
+| `GuestOnlyRoute` | If `user`, redirect `/`. |
+| `RegisteredOnlyRoute` | `ProtectedRoute` + `!user.isGuest`. |
 
 **`App.tsx` routes:**
 
@@ -2517,211 +2441,100 @@ const buttonVariants = ({ variant, size }: { variant: Variant; size: Size }): st
 | `/register` | `RegisterPage` | `GuestOnlyRoute` |
 | `/guest` | `GuestEntryPage` | `GuestOnlyRoute` |
 | `/room/:roomCode` | `GameRoomPage` | `ProtectedRoute` |
-| `/leaderboard` | `LeaderboardPage` | — |
-| `/u/:username` | `PublicProfilePage` | — |
+| `/leaderboard` | `LeaderboardPage` | -- |
+| `/u/:username` | `PublicProfilePage` | -- |
 | `/profile` | `MyProfilePage` | `RegisteredOnlyRoute` |
-| `/settings/*` | `SettingsLayout` + nested routes | `RegisteredOnlyRoute` |
-| `/admin/*` | `AdminLayout` + nested routes | `AdminRoute` |
-| `*` | `NotFoundPage` | — |
-
-**SECURITY:**
-- Route guards display a spinner while `loading === true` — no flash of admin or protected content for unauthenticated users.
-- Guards enforce client-side gating for UX; server still re-checks on every API/socket call.
+| `/settings/*` | `SettingsLayout` + nested | `RegisteredOnlyRoute` |
+| `/admin/*` | `AdminLayout` + nested | `AdminRoute` |
+| `*` | `NotFoundPage` | -- |
 
 ---
 
-# PHASE 8 — Client Pages
+# PHASE 8 — CLIENT PAGES
+
+---
 
 ## STEP 35 — Auth Pages (Login, Register, Guest Entry)
 
-**`LoginPage.tsx`**: typed form state `{ email: string; password: string }`. Submit → `authService.login` → store token → navigate `/`. Show generic error toast on failure ("Invalid email or password").
+**`LoginPage.tsx`**: typed form state `{ email, password }`. Submit -> `authService.login` -> store token -> navigate `/`.
 
-**`RegisterPage.tsx`**: typed form state `{ username: string; email: string; password: string; displayName: string }`. Client-side regex hints (3–20 chars, lowercase, etc.) but server is the truth. Submit → `register` → auto-login → navigate `/`.
+**`RegisterPage.tsx`**: typed form state `{ username, email, password, displayName }`. Submit -> `register` -> auto-login -> navigate `/`.
 
-**`GuestEntryPage.tsx`**: typed form state `{ displayName: string }`. Big "Play as Guest" button. Submit → `loginAsGuest` → navigate `/`. Banner: "Guest progress is not saved. Stats and leaderboard require an account."
-
-**Shared form UX:** disabled submit while pending, inline field errors mapped from backend `errors[]`.
-
-**SECURITY:**
-- Errors surfaced to UI are exactly the strings returned by the server — no leaking of raw exception data.
-- No password autocompleting on the registration form for the displayName field.
+**`GuestEntryPage.tsx`**: typed form state `{ displayName }`. Submit -> `loginAsGuest` -> navigate `/`. Banner: "Guest progress is not saved."
 
 ---
 
 ## STEP 36 — Home / Lobby Page (Create / Join / Matchmake)
 
 **`HomePage.tsx` sections:**
-
 1. **Hero** with display name and CTAs.
-2. **Create Room** card: select `gameType` (`TicTacToe` 2P / `Card Game` 4P), private toggle, "Create" → emit `room:create` → on `room:state`, navigate `/room/:roomCode`.
-3. **Join Room** card: input `roomCode` → emit `room:join` → on success navigate `/room/:roomCode`.
-4. **Matchmaking** card: select gameType → emit `matchmaking:join` → show queue position + spinner → on `matchmaking:matched`, emit `room:join` → navigate.
-5. **Recent Public Rooms** (optional, fetched via REST `/api/admin/rooms` if admin, else hidden) — list shows public, non-`isPrivate` rooms with open seats; "Watch" emits join with `asSpectator: true`.
-
-**Cancel queue button** while queued → emit `matchmaking:cancel`.
-
-**SECURITY:**
-- Server-emitted `error_event` codes (`ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_IN_ROOM`, `GAME_IN_PROGRESS`) are mapped to user-friendly toasts; codes themselves never displayed verbatim.
+2. **Create Room** card: select `gameType`, private toggle, "Create" -> emit `room:create`.
+3. **Join Room** card: input `roomCode` -> emit `room:join`.
+4. **Matchmaking** card: select gameType -> emit `matchmaking:join` -> show queue position.
 
 ---
 
 ## STEP 37 — Game Room Page Orchestration
 
-**`GameRoomPage.tsx`** layout. Typed state: `{ room: Room | null; gameState: GameState | null; chat: ChatMessage[]; turnInfo: { currentPlayerId: string } | null }`.
+**`GameRoomPage.tsx`** layout. Typed state: `{ room, gameState, chat, turnInfo }`.
 
-- **Header**: room code (copy button), gameType, status pill (`waiting`/`in_progress`/`ended`), Leave button.
-- **Left column**: `PlayerList` (avatar, displayName, position, online dot, your-turn highlight). `SpectatorList`.
-- **Center column**: `GameBoardFrame` — renders `<TicTacToeBoard />` or `<CardGameTable />` based on `gameType`. `TurnIndicator` above the board. `RematchPrompt` after `game:end`.
-- **Right column**: `ChatPanel` — scrollable history, input with 300-char counter.
-
-**Subscribed socket events:** `room:state`, `room:player_joined`, `room:player_left`, `room:closed`, `game:state`, `game:turn`, `game:end`, `chat:message`, `error_event`.
-
-**On mount:** if not already joined (e.g., direct URL), emit `room:join { roomCode, asSpectator: true }` (defaulting to spectator if game is in progress and not a player; server decides).
-
-**On unmount / navigate away:** emit `room:leave`.
-
-**Visual states:**
-- Disconnected player → grayed-out card with "Reconnecting…".
-- Game ended → overlay with result, Rematch button (players only), "Back to Home" (everyone).
-
-**SECURITY:**
-- All data shown is from server pushes; no derived "you can play here" UI relies on client state.
-- Action buttons disabled when `currentTurnUserId !== user._id` — hard-disabled, not just hidden.
+- **Header**: room code (copy button), gameType, status pill, Leave button.
+- **Left column**: `PlayerList`, `SpectatorList`.
+- **Center column**: `GameBoardFrame` -> `<TicTacToeBoard />` or `<CardGameTable />`. `TurnIndicator`. `RematchPrompt`.
+- **Right column**: `ChatPanel`.
 
 ---
 
 ## STEP 38 — Game Room Sub-Components (PlayerList, SpectatorList, ChatPanel, TurnIndicator, RematchPrompt)
 
-Decompose `GameRoomPage`'s complex layout into focused, individually-testable child components. Each receives only what it needs as typed props; none subscribe to socket events directly (parent does).
+Decompose `GameRoomPage`'s complex layout into focused, individually-testable child components.
 
-**`components/game/PlayerList.tsx`** props: `{ players: RoomPlayer[]; currentTurnUserId: string | null; mySelfUserId: string }`.
-- Renders one card per player: avatar, displayName, position badge, online dot (green/red based on `isConnected`), turn highlight ring when `player.userId === currentTurnUserId`.
-- Self card has subtle "(you)" suffix.
-- Memoized via `React.memo`; re-renders only when player array shape changes (compare via shallow equality on `players.length` + `players.map(p => p.userId + p.isConnected).join()`).
-
-**`components/game/SpectatorList.tsx`** props: `{ spectators: RoomSpectator[] }`.
-- Compact horizontal list of avatars with tooltip displayName.
-- Counter badge: "{count} watching".
-- Hidden entirely when `spectators.length === 0`.
-
-**`components/game/TurnIndicator.tsx`** props: `{ currentPlayerId: string | null; mySelfUserId: string; players: RoomPlayer[] }`.
-- Large status text: "Your turn", "Waiting for {displayName}…", "Game in progress" (initial), or "Game over" (post-end).
-- `aria-live="polite"` so screen readers announce turn changes (Step 48).
-- Subtle pulse animation when it's your turn.
-
-**`components/game/ChatPanel.tsx`** props: `{ messages: ChatMessage[]; onSend: (text: string) => void; throttledUntil: number | null }`.
-- Scrollable history (auto-scroll to bottom on new message unless user has scrolled up — track with ref + scroll detection).
-- Input field with `<CharacterCounter current={input.length} max={300} />`.
-- Submit on Enter; Shift+Enter inserts newline (rejected by validator since 1-line messages only).
-- Disabled state with countdown when `throttledUntil > Date.now()`: "Please wait Ns…".
-- Each message row uses memoized `<ChatMessageRow>` keyed by `${from}:${timestamp}`.
-- Plays `chat` sound when new message arrives AND `document.hidden === true` (Step 47).
-
-**`components/game/RematchPrompt.tsx`** props: `{ visible: boolean; iAmPlayer: boolean; rematchVotes: string[]; players: RoomPlayer[]; onRequest: () => void; onDecline: () => void }`.
-- Modal overlay shown when `visible && room.status === 'ended'`.
-- Shows result first, then list of players with vote status (✓ if voted, "Pending" otherwise).
-- "Rematch" button (disabled if I already voted), "Back to Home" button.
-- When all players have voted, modal auto-dismisses; new game starts via fresh `game:state` push.
-
-**`components/game/GameBoardFrame.tsx`** props: `{ gameType: GameType; gameState: GameState; isMyTurn: boolean; mySelfUserId: string; onAction: (action: GameAction) => void }`.
-- Discriminated-union switch on `gameState.gameType`:
-  - `'tictactoe'` → renders `<TicTacToeBoard />` (Step 39).
-  - `'cardgame'` → renders `<CardGameTable />` (Step 40).
-- TypeScript exhaustiveness check via `never`-cast on the default branch — adding a new game without a new case fails compile.
-
-**Component composition map (`GameRoomPage`):**
-
-```
-<GameRoomPage>
-├── <ConnectionBanner />            (from Step 45, mounted in MainLayout)
-├── <header> roomCode + status pill + Leave button </header>
-├── <PlayerList />
-├── <TurnIndicator />
-├── <GameBoardFrame />
-│   └── <TicTacToeBoard /> | <CardGameTable />
-├── <ChatPanel />
-├── <SpectatorList />
-└── <RematchPrompt />
-```
-
-**SECURITY:** Sub-components receive already-sanitized data from `gameState`. They do not perform any independent state derivation that could leak hidden info (e.g., `ChatPanel` never has access to player hands).
+**`PlayerList.tsx`** — avatar, displayName, online dot, turn highlight.
+**`SpectatorList.tsx`** — compact horizontal list with counter badge.
+**`TurnIndicator.tsx`** — "Your turn" / "Waiting for {name}" with `aria-live="polite"`.
+**`ChatPanel.tsx`** — scrollable history, 300-char input, throttle UX.
+**`RematchPrompt.tsx`** — modal overlay with vote status.
+**`GameBoardFrame.tsx`** — discriminated-union switch on `gameState.gameType`.
 
 ---
 
 ## STEP 39 — TicTacToe Board Component
 
-**`TicTacToeBoard.tsx` props (typed):** `TicTacToeState & { isMyTurn: boolean; mySymbol: 'X' | 'O' | null; onPlay: (index: number) => void }`.
-
-- 3×3 CSS grid of cells. Empty cell → clickable iff `isMyTurn && !cell && !result`.
-- Click → `onPlay(index)` which emits `game:action { action: 'play', payload: { index } }`.
-- Winning line cells highlighted post-result.
-- Sounds: `click` on play, `turn` on turn-flip, `win`/`lose` on result.
-
-**SECURITY:**
-- `index` is the only client input; server validates (Step 18).
+**`TicTacToeBoard.tsx`**: 3x3 CSS grid, click on empty cell when `isMyTurn`, winning line highlighted, sounds on play/win/lose.
 
 ---
 
 ## STEP 40 — Card Game Component
 
-**`CardGameTable.tsx` props (typed):** `CardGameState & { isMyTurn: boolean; onPlayCard: (card: Card) => void }`.
-
-- Top/left/right player slots show avatar, displayName, `handCount` (number of cards), `tricksWon`.
-- Center: `currentTrick` cards animated to a tabletop area, with `leadSuit` indicator.
-- Bottom: `myHand` shown as fanned cards. Card hover lifts; click only allowed when `isMyTurn`. Cards that violate "must follow suit" are visually dimmed (computed client-side as a hint only — server still validates).
-- Click → `onPlayCard(card)` emits `game:action { action: 'play_card', payload: { card } }`.
-
-**SECURITY:**
-- `myHand` is only the cards the **server** sent us; the client never derives or reveals other players' hands.
-- Suit-following dimming is UX only — final validation is server-side.
+**`CardGameTable.tsx`**: 4-player layout, center trick area, bottom hand, follow-suit dimming, card play on click.
 
 ---
 
 ## STEP 41 — Leaderboard Page
 
-**`LeaderboardPage.tsx`** filters: `gameType` (All/TicTacToe/CardGame), pagination.
-
-Table columns: Rank, Avatar, Display Name, Wins, Losses, Draws, Games Played, Win Rate. Username links to `/u/:username`.
-
-Empty state: "No players yet. Be the first to win a game!"
-
-**SECURITY:**
-- Only fields the API projected — no email, no preferences leakage.
+**`LeaderboardPage.tsx`**: filters by `gameType`, pagination. Table columns: Rank, Avatar, Display Name, Wins, Losses, Draws, Games Played, Win Rate.
 
 ---
 
 ## STEP 42 — Profile Pages (Public & Own)
 
-**`PublicProfilePage.tsx`** (`/u/:username`):
-- Header: avatar, display name, role badge, member-since.
-- Tabs: **Stats** (per-game cards from `statsByGame`), **Recent Matches** (from `getUserMatches`).
-- If target user has `privacy.showStats === false`, show "This user has hidden their stats."
+**`PublicProfilePage.tsx`** (`/u/:username`): Header + Tabs (Stats, Recent Matches). Privacy-filtered.
 
-**`MyProfilePage.tsx`** (`/profile`): same layout as public, plus "Edit profile" CTA → `/settings/profile`.
-
-**SECURITY:**
-- Privacy filtering is rendered conditionally based on what the API returned (which is itself filtered server-side) — UI never displays fields the server didn't send.
+**`MyProfilePage.tsx`** (`/profile`): Same layout plus "Edit profile" CTA -> `/settings/profile`.
 
 ---
 
 ## STEP 43 — Settings Pages
 
-Auto-save on blur for non-sensitive prefs (theme, fontSize, animations, sounds, notifications, privacy). Confirm modal for destructive actions.
+Auto-save on blur for non-sensitive prefs. Confirm modal for destructive actions.
 
 | Page | Fields |
 |---|---|
-| `ProfileSettings` | displayName (text, 2–30), bio (textarea, 200), avatar upload + remove |
-| `AccountSettings` | change password (current + new + confirm), delete account (password confirm + typed phrase) |
-| `AppearanceSettings` | theme `light`/`dark`/`system` (radio), fontSize `small`/`medium`/`large`, animations toggle, sounds toggle |
-| `NotificationsSettings` | matchInvite toggle, rematch toggle |
-| `PrivacySettings` | showStats toggle, showOnLeaderboard toggle |
-
-**Reusable components:** `ToggleSwitch`, `SelectableCard` (for theme/fontSize radio cards), `CharacterCounter`.
-
-**SECURITY:**
-- Password fields are `type="password"` with `autoComplete="current-password"` / `"new-password"`.
-- Delete account requires both password and a typed confirmation phrase ("DELETE my account").
-- Avatar upload progress shows a spinner; no client-side image processing that could mis-report file type.
+| `ProfileSettings` | displayName, bio, avatar upload/remove |
+| `AccountSettings` | change password, delete account |
+| `AppearanceSettings` | theme, fontSize, animations, sounds |
+| `NotificationsSettings` | matchInvite, rematch toggles |
+| `PrivacySettings` | showStats, showOnLeaderboard toggles |
 
 ---
 
@@ -2729,83 +2542,32 @@ Auto-save on blur for non-sensitive prefs (theme, fontSize, animations, sounds, 
 
 | Page | Content |
 |---|---|
-| `AdminDashboard` | Cards: Total Users, Total Admins, Total Matches, Active Rooms, Queue Size. Chart-style table: matches per game type. |
-| `AdminUsers` | Search (debounced 300ms), filter by role, paginated table (avatar, username, email, role, gamesPlayed, lastLoginAt, actions). Actions: change role (modal with current-admin + last-admin guards client-side reflected from server response), delete user (confirm modal). |
-| `AdminActiveRooms` | Live list (polled every 10s OR refreshed via admin socket subscription). Columns: roomCode, gameType, status, players, createdAt, actions (Force Close → emits REST DELETE → server emits `room:closed` to room). |
-| `AdminMatches` | Recent matches list with filter by game type. Click row → match detail (read-only). |
-
-**Self-protection UI:** in `AdminUsers`, the row representing `req.user` shows disabled "Change Role" and "Delete" actions.
-
-**SECURITY:**
-- All server-side guards (admin self-protection, last-admin) re-checked on the backend; UI disabling is purely UX.
-- Confirm modals required for destructive actions to prevent accidental clicks.
+| `AdminDashboard` | Stat cards: Total Users, Admins, Matches, Active Rooms, Queue Size |
+| `AdminUsers` | Search, filter, paginated table, role change, delete |
+| `AdminActiveRooms` | Live list (polled), Force Close action |
+| `AdminMatches` | Recent matches with game type filter |
 
 ---
 
-# PHASE 9 — Client Polish
+# PHASE 9 — CLIENT POLISH
+
+---
 
 ## STEP 45 — Reconnection UX Flow (Banner, Retry, Rejoin Toast)
 
-Make disconnects feel handled rather than scary. The server already keeps a 30-second grace window (Step 24); the client must visually communicate every state of that window.
+Make disconnects feel handled. The server keeps a 30-second grace window (Step 24); the client communicates every state.
 
-**State machine on the client:**
+**Connection states:** `connected`, `disconnected_temporary`, `disconnected_terminal`, `reconnected`.
 
-| Connection State | Trigger | UI |
-|---|---|---|
-| `connected` | initial `connect` event | Nothing (default) |
-| `disconnected_temporary` | `disconnect` reason ∈ `{ 'transport close', 'transport error', 'ping timeout' }` | Sticky top banner: "Reconnecting…" with animated dots, retry counter ("attempt 3 of ∞") |
-| `disconnected_terminal` | `disconnect` reason `'io server disconnect'` (server kicked us) OR `connect_error` with `UNAUTHORIZED` | Banner: "Disconnected: <reason>." with "Reconnect" button + Logout button |
-| `reconnected` | `connect` event after a previous `disconnect` | Toast: "Reconnected. Catching up…" then `room:state`/`game:state` push from server replaces stale local state |
-
-**`SocketContext.tsx`** additions:
-- Track `reconnectAttempts: number` (incremented on `reconnect_attempt`).
-- Track `lastDisconnectReason: string | null`.
-- Expose `connectionState: 'connected' | 'disconnected_temporary' | 'disconnected_terminal' | 'connecting'`.
-
-**`components/system/ConnectionBanner.tsx`** typed component reading `useContext(SocketContext)`. Mounted once globally inside `MainLayout` so it spans every route.
-
-**Game-specific UX inside `GameRoomPage.tsx`:**
-- When self disconnects: show a translucent overlay on the game board with "Reconnecting… your turn timer is paused server-side."
-- When **opponent** disconnects (received via `room:state` with their `isConnected: false`): grey out their player card, show a small countdown ("Forfeits in 28s…") driven by a local interval seeded from the server's last `room:state` timestamp.
-- On opponent return (`room:state` with `isConnected: true` again): toast "{displayName} reconnected." Cancel local countdown.
-
-**Reconnection token validation:**
-- If the `connect_error` carries `UNAUTHORIZED` (token expired during disconnect window), client clears `localStorage.token`, navigates to `/login`, shows toast "Your session expired. Please log in again."
-
-**SECURITY:**
-- The "Forfeits in Ns" countdown is a **visual hint only** — the server is the single source of truth and may forfeit at any moment. Client never decides forfeit.
-- Banner messages never include error stack/server internals — only generic states.
-- Manual "Reconnect" button on the terminal state forces a fresh `connectSocket(token)` call; if token is stale, the server rejects and the auto-redirect to `/login` kicks in.
+**`components/system/ConnectionBanner.tsx`** — mounted globally inside `MainLayout`.
 
 ---
 
 ## STEP 46 — Animations & Game Feel (Transitions, Piece Drop, Card Flip, Win Highlight)
 
-Make the games feel responsive and alive. All animations honor `preferences.animations`; when `false`, a CSS class on `<html>` short-circuits every `transition`/`animation` to `none`.
+All animations honor `preferences.animations`; when `false`, CSS short-circuits to `none`.
 
-**Tailwind animation tokens** added in `index.css` `@theme`:
-
-| Token | Use |
-|---|---|
-| `--animate-piece-drop` | TicTacToe X/O placement (200ms ease-out scale + opacity) |
-| `--animate-card-flip` | CardGame card play (300ms 3D rotateY) |
-| `--animate-card-deal` | CardGame initial deal (staggered 50ms per card) |
-| `--animate-win-pulse` | Winning line / trick highlight (1s pulse, 3 iterations) |
-| `--animate-toast-in` / `out` | Toast entry/exit |
-| `--animate-modal-in` / `out` | Modal backdrop + content |
-| `--animate-page-fade` | Route transition |
-
-**Per-game animation hooks:**
-
-| Component | Animation |
-|---|---|
-| `TicTacToeBoard` cell | New `X`/`O` enters with `animate-piece-drop`. Identify "new" by comparing previous `board` prop with current via `useRef`. |
-| `TicTacToeBoard` win | After `result === 'win'`, derive winning line indexes; apply `animate-win-pulse` to those 3 cells, stronger color. |
-| `CardGameTable` deal | On `gameState` first load, stagger card entry into `myHand` with 50ms intervals. |
-| `CardGameTable` play | Card moves from hand position to trick area with FLIP technique (measure → animate). |
-| `CardGameTable` trick win | The winning card briefly scales up + glows before all 4 cards collapse into the winner's "tricks won" pile. |
-| `RematchPrompt` modal | `animate-modal-in` on mount, `animate-modal-out` on dismiss. |
-| Page transitions | `App.tsx` wraps `<Outlet />` in a div with `key={location.pathname}` and `animate-page-fade`. |
+**Tailwind animation tokens:** `--animate-piece-drop`, `--animate-card-flip`, `--animate-card-deal`, `--animate-win-pulse`, `--animate-toast-in/out`, `--animate-modal-in/out`, `--animate-page-fade`.
 
 **FLIP helper** (`utils/flipAnimation.ts`):
 
@@ -2821,71 +2583,28 @@ export const flipAnimate = (el: HTMLElement, prevRect: DOMRect, durationMs = 300
 };
 ```
 
-**Reduced motion respect:** also check `window.matchMedia('(prefers-reduced-motion: reduce)').matches` in addition to user preference. Both must be `false` (preference: `true`, system: `no-preference`) for animations to play.
-
-**SECURITY:** Animations are pure presentation; they never gate gameplay. A user who disables them must still be able to play every move and see every state change.
+**Reduced motion respect:** check both `preferences.animations` and `window.matchMedia('(prefers-reduced-motion: reduce)')`.
 
 ---
 
 ## STEP 47 — Sound Design (Preload, Volume, Mute, Contextual Triggers)
 
-A small set of carefully chosen sounds dramatically improves perceived quality.
+**Sound assets in `client/public/sounds/`:** `click.mp3`, `turn.mp3`, `move.mp3`, `win.mp3`, `lose.mp3`, `draw.mp3`, `chat.mp3`, `match-found.mp3`.
 
-**Sound assets in `client/public/sounds/`:**
+**`hooks/useSounds.ts`** — preloads audio, respects `preferences.sounds` and `soundVolume`.
 
-| File | Use |
-|---|---|
-| `click.mp3` | UI button clicks (kept subtle) |
-| `turn.mp3` | "Your turn" notification when `currentTurnUserId` flips to self |
-| `move.mp3` | Opponent placed a piece / played a card |
-| `win.mp3` | `game:end` with self as winner |
-| `lose.mp3` | `game:end` with self losing |
-| `draw.mp3` | `game:end` with `result: 'draw'` |
-| `chat.mp3` | New chat message (only when window not focused) |
-| `match-found.mp3` | `matchmaking:matched` event |
-
-**`hooks/useSounds.ts` enhanced:**
-
-```ts
-type SoundName = 'click' | 'turn' | 'move' | 'win' | 'lose' | 'draw' | 'chat' | 'match-found';
-
-export const useSounds = () => {
-  const { preferences } = useContext(PreferencesContext);
-  const cacheRef = useRef<Map<SoundName, HTMLAudioElement>>(new Map());
-
-  const play = useCallback((name: SoundName, volumeOverride?: number): void => {
-    if (!preferences.sounds) return;
-    let audio = cacheRef.current.get(name);
-    if (!audio) {
-      audio = new Audio(`/sounds/${name}.mp3`);
-      audio.preload = 'auto';
-      cacheRef.current.set(name, audio);
-    }
-    audio.currentTime = 0;
-    audio.volume = volumeOverride ?? preferences.soundVolume ?? 0.7;
-    void audio.play().catch(() => { /* autoplay policy may block — silent fail */ });
-  }, [preferences.sounds, preferences.soundVolume]);
-
-  return { play };
-};
-```
-
-**Trigger map (where to call `play(name)`):**
+**Trigger map:**
 
 | Trigger | Sound | Component |
 |---|---|---|
-| Any `<Button>` click | `click` (volume 0.3) | `ui/Button.tsx` |
-| `game:turn` event with `currentPlayerId === self` | `turn` | `GameRoomPage.tsx` |
-| Opponent move arrives via `game:state` (board diff or hand-count diff) | `move` | `GameRoomPage.tsx` |
-| `game:end` self winner | `win` | `GameRoomPage.tsx` |
-| `game:end` opponent winner | `lose` | `GameRoomPage.tsx` |
-| `game:end` `result: 'draw'` | `draw` | `GameRoomPage.tsx` |
-| `chat:message` and `document.hidden === true` | `chat` | `ChatPanel.tsx` |
-| `matchmaking:matched` | `match-found` | `HomePage.tsx` |
-
-**Settings additions:** add `soundVolume` (number 0–1, default 0.7) to `UserPreferences` in `shared/types/user.ts` and to `AppearanceSettings` page (slider).
-
-**SECURITY:** No security implications — sounds are local assets served from `client/public/`.
+| Button click | `click` (volume 0.3) | `ui/Button.tsx` |
+| Your turn | `turn` | `GameRoomPage.tsx` |
+| Opponent move | `move` | `GameRoomPage.tsx` |
+| Self winner | `win` | `GameRoomPage.tsx` |
+| Opponent winner | `lose` | `GameRoomPage.tsx` |
+| Draw | `draw` | `GameRoomPage.tsx` |
+| Chat (window hidden) | `chat` | `ChatPanel.tsx` |
+| Match found | `match-found` | `HomePage.tsx` |
 
 ---
 
@@ -2893,399 +2612,160 @@ export const useSounds = () => {
 
 Every interactive element must be reachable and announceable without a mouse.
 
-**Game boards keyboard navigation:**
+**Game boards keyboard navigation:** TicTacToe: arrow keys + Enter/Space. CardGame: arrow keys cycle cards + Enter/Space.
 
-| Game | Keys |
-|---|---|
-| TicTacToe | `Tab` enters board → arrow keys move focus across 3×3 grid → `Enter`/`Space` plays the focused cell. Disabled (occupied/not-your-turn) cells skipped via `tabindex="-1"`. |
-| CardGame | `Tab` enters hand → arrow keys cycle cards → `Enter`/`Space` plays card. Suit-following hint also announced via `aria-describedby` on dimmed cards. |
+**ARIA contracts:** `role="grid"` for board, `role="gridcell"` for cells, `role="status"` + `aria-live="polite"` for turn indicator, `role="dialog"` + `aria-modal="true"` for modals.
 
-**ARIA contracts:**
+**Focus management:** Route change focuses `<h1>`. Modal traps focus. Post-game focuses rematch button.
 
-| Element | Attributes |
-|---|---|
-| TicTacToe board | `role="grid"`, `aria-label="TicTacToe game board"` |
-| TicTacToe cell | `role="gridcell"`, `aria-label="Row {r}, Column {c}, {empty/X/O}"`, `aria-disabled={!canPlay}` |
-| Card in hand | `role="button"`, `aria-label="Card: {rank} of {suit}"`, `aria-disabled={!canPlay}` |
-| Turn indicator | `role="status"`, `aria-live="polite"` so screen readers announce turn changes |
-| Chat panel | new messages container `aria-live="polite"`, `aria-atomic="false"` |
-| Toast notifications | `aria-live="assertive"` for errors, `polite` for success |
-| Connection banner | `role="alert"` |
-| All form inputs | `<label htmlFor>` paired with `id`; error messages `aria-describedby` linked |
-| Modal dialogs | `role="dialog"`, `aria-modal="true"`, focus trapped, `Escape` closes, focus returns to trigger on close |
-| Buttons with icon only | `aria-label` describing action |
-
-**Focus management:**
-- Route change focuses the page's `<h1>` (use `useEffect` + `tabindex="-1"` + `.focus()`).
-- Modal open: focus first interactive element. Modal close: restore focus to the trigger button.
-- After `game:end`, focus moves to the rematch button automatically.
-
-**Color contrast:** every text/background pair tested against WCAG AA (4.5:1 normal, 3:1 large). Tailwind theme tokens audited; status badges use icon + text, never color alone.
-
-**Screen reader testing checklist:**
-- [ ] NVDA on Windows announces board state, turn changes, game end, chat messages.
-- [ ] VoiceOver on macOS does the same.
-- [ ] All interactive elements have a visible focus ring (Tailwind `focus-visible:ring-2`).
-- [ ] No `outline: none` without a custom replacement.
-
-**SECURITY:** Accessibility additions are pure UX and don't expose any new state to the client.
+**Color contrast:** WCAG AA (4.5:1 normal, 3:1 large). Status badges use icon + text, never color alone.
 
 ---
 
 ## STEP 49 — Performance (React.memo, Code Splitting, Lazy Routes, useCallback Strategy)
 
-Keep first paint fast and interaction smooth even with several active sockets.
+**Code splitting:** `/admin/*`, `/settings/*`, `/leaderboard`, `/u/:username` lazy-loaded. Critical paths not lazy.
 
-**Code splitting via `React.lazy`:**
+**`React.memo` targets:** `PlayerList`, `SpectatorList`, `ChatMessage`, TicTacToe cells, `CardInHand`.
 
-| Route | Lazy? | Reason |
-|---|---|---|
-| `/admin/*` | yes | Most users never see admin |
-| `/settings/*` | yes | Visited rarely |
-| `/leaderboard` | yes | Optional viewing |
-| `/u/:username` | yes | Optional viewing |
-| `/`, `/login`, `/register`, `/guest`, `/room/:roomCode` | no | Critical path |
-
-Use `<Suspense fallback={<Spinner />}>` per lazy boundary.
-
-**`React.memo` targets** (props rarely change while parent re-renders frequently):
-
-| Component | Why |
-|---|---|
-| `PlayerList` | Updates only on `room:state` players diff |
-| `SpectatorList` | Updates only on spectator joins/leaves |
-| `ChatMessage` (single message) | Memoize each row keyed by `id+timestamp` so chat list re-renders only the new row |
-| `TicTacToeBoard` cells | Each cell memoized on `(value, isWinningCell, canPlay)` |
-| `CardInHand` | Each card memoized on `(card, isPlayable, isSelected)` |
-
-**`useCallback` for event handlers passed deeply:**
-- `onPlay`, `onPlayCard`, `onSendChat`, `onRematch` in `GameRoomPage.tsx` all wrapped to keep stable references.
-
-**`useMemo` for derived state:**
-- `winningLine` indexes in TicTacToe.
-- `myHandSorted` (by suit, then rank) in CardGame.
-- Leaderboard row computations.
-
-**Avoiding unnecessary socket re-subscriptions:**
-- `useSocketEvent` already cleans up on unmount; ensure handler refs are stable via `useCallback`.
-
-**Bundle analysis:**
-- Add `rollup-plugin-visualizer` to `vite.config.ts` (dev only) — produces `stats.html` after `npm run build`. Goal: main chunk < 250 KB gzipped.
-
-**Network optimizations:**
-- Preconnect to backend domain via `<link rel="preconnect" href={VITE_SOCKET_URL}>` in `index.html`.
-- Image lazy loading: `<img loading="lazy">` on avatar lists (leaderboard, admin users table).
-
-**Server-side perf:**
-- `compression` middleware (gzip) added in `server.ts`.
-- Drizzle returns plain rows (no document hydration overhead). For read-only public endpoints (leaderboard, public profiles, match list), use the explicit projection helpers (`usersPublicSelect`) so the wire payload omits `password` and any future internal columns.
-
-**SECURITY:** Lazy chunks must still go through the same auth guards; route guards run before the lazy boundary mounts, so unauthenticated users never download admin code.
+**Bundle analysis:** `rollup-plugin-visualizer` produces `stats.html`. Goal: main chunk < 250 KB gzipped.
 
 ---
 
 ## STEP 50 — Responsive Design (Mobile Game Room, Touch Targets, Adaptive Board)
 
-Game must be playable on phones (≥360px) without compromising desktop layout.
+**Breakpoints:** `sm: 640`, `md: 768`, `lg: 1024`, `xl: 1280`.
 
-**Breakpoints (Tailwind defaults):** `sm: 640`, `md: 768`, `lg: 1024`, `xl: 1280`.
+**Mobile GameRoom:** Tab bar (`Players` / `Game` / `Chat`) at top; each fills viewport.
 
-**Page-by-page responsive plan:**
-
-| Page | Mobile (<768) | Desktop (≥1024) |
-|---|---|---|
-| `HomePage` | Single-column stacked cards | 2-column grid (Create + Join, Matchmaking + Recent) |
-| `GameRoomPage` | Tab bar at top: `Players` / `Game` / `Chat`. Each tab fills viewport. | 3-column: PlayerList (left), Game (center), Chat (right) |
-| `TicTacToeBoard` | Board fills 90vw, max 320px | Fixed 480px |
-| `CardGameTable` | Horizontal scroll for hand, opponent slots compress to avatar+count only | Full table layout with all 4 sides visible |
-| `LeaderboardPage` | Card-style rows (no table) | Full table |
-| `AdminUsers` | Card-style rows | Sortable table |
-| `Navbar` | Hamburger → drawer | Inline links |
-| `SettingsLayout` | Top dropdown picker for sub-section | Side nav + content |
-| `AdminLayout` | Top dropdown for sidebar | Side nav |
-| Modals | Full-screen on `<sm` | Centered card |
-
-**Touch target sizes:** every interactive element ≥ 44×44 px on mobile. TicTacToe cells default to 96×96 px; card hand items ≥ 48px tall.
-
-**Viewport meta** in `index.html`: `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">` (allow zoom for accessibility).
-
-**Adaptive tab navigator (`components/game/MobileTabBar.tsx`):**
-
-```tsx
-// Only rendered when window width < 768. Tracks active tab in local state.
-// Each tab corresponds to a slot inside GameRoomPage; CSS `display: contents` swaps active panel.
-```
-
-**Testing matrix:**
-
-| Device | Resolution | Manual test |
-|---|---|---|
-| iPhone SE | 375×667 | Game playable, chat readable |
-| iPhone 14 | 390×844 | Hand cards visible without horizontal scroll |
-| iPad | 768×1024 | Layout transitions cleanly to desktop |
-| Desktop FHD | 1920×1080 | All 3 columns visible without scroll |
-
-**404 page:** `NotFoundPage.tsx` — large 404, brief copy, "Go Home" button. Final pass on guards: ensure `ProtectedRoute` shows `<Spinner />` while `loading === true`. (This subsumes the dedicated 404 step from earlier drafts.)
-
-**SECURITY:** No security implications for responsive design; all data filtering remains server-side.
+**Touch targets:** >= 44x44 px on mobile.
 
 ---
 
-# PHASE 10 — Client Testing
+# PHASE 10 — CLIENT TESTING
+
+---
 
 ## STEP 51 — Component Tests (React Testing Library: forms, board, chat)
 
-Lock in critical UI flows so refactors don't silently break gameplay.
+**Tooling:** Vitest, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, `msw`.
 
-**Tooling:** Vitest (already in client, via `vite`), `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, `msw` (mock REST), `vitest-mock-extended`.
-
-**Test config (`client/vitest.config.ts`):** environment `jsdom`, setup file imports `@testing-library/jest-dom/vitest`, mocks `socket.io-client` with a controllable EventEmitter stub.
-
-**Test files (each next to the component):**
+**Test files:**
 
 | File | What it covers |
 |---|---|
-| `pages/auth/__tests__/LoginPage.test.tsx` | Form validation, generic error toast on bad credentials, redirect on success |
-| `pages/auth/__tests__/RegisterPage.test.tsx` | Username/email validation, mismatch errors, auto-login post-register |
-| `pages/auth/__tests__/GuestEntryPage.test.tsx` | DisplayName validation, navigate to `/` on success |
-| `components/games/__tests__/TicTacToeBoard.test.tsx` | Board renders 9 cells, click on empty cell when `isMyTurn` calls `onPlay(index)`, click ignored when not my turn, winning line highlighted |
-| `components/games/__tests__/CardGameTable.test.tsx` | Hand renders correct cards, click on suit-following card calls `onPlayCard`, off-suit dimmed |
-| `components/game/__tests__/ChatPanel.test.tsx` | Message list renders, send button submits, 300-char enforcement, throttle UX |
-| `components/game/__tests__/PlayerList.test.tsx` | Connected/disconnected dot, current-turn highlight |
-| `components/guards/__tests__/ProtectedRoute.test.tsx` | Spinner during loading, redirect on no user |
-| `components/guards/__tests__/AdminRoute.test.tsx` | Redirect for non-admin, allow for admin |
-| `context/__tests__/AuthContext.test.tsx` | Login persists token, logout clears, `isGuest`/`isAdmin` derive correctly |
-| `pages/__tests__/LeaderboardPage.test.tsx` | Renders rows, filter by gameType, pagination |
-| `hooks/__tests__/useSocketEvent.test.ts` | Subscribes on mount, unsubscribes on unmount |
+| `LoginPage.test.tsx` | Form validation, error toast, redirect on success |
+| `RegisterPage.test.tsx` | Validation, mismatch errors, auto-login |
+| `GuestEntryPage.test.tsx` | DisplayName validation, navigate on success |
+| `TicTacToeBoard.test.tsx` | 9 cells render, click calls `onPlay`, winning line highlighted |
+| `CardGameTable.test.tsx` | Hand renders, suit-following, off-suit dimmed |
+| `ChatPanel.test.tsx` | Message list, send, 300-char, throttle UX |
+| `PlayerList.test.tsx` | Connected/disconnected dot, turn highlight |
+| `ProtectedRoute.test.tsx` | Spinner during loading, redirect on no user |
+| `AdminRoute.test.tsx` | Redirect for non-admin, allow for admin |
+| `AuthContext.test.tsx` | Login persists token, logout clears |
+| `LeaderboardPage.test.tsx` | Renders rows, filter, pagination |
+| `useSocketEvent.test.ts` | Subscribes on mount, unsubscribes on unmount |
 
-**Mock socket pattern:**
-
-```ts
-class MockSocket extends EventEmitter {
-  emit = vi.fn();
-  on = (ev: string, fn: (...args: unknown[]) => void) => super.on(ev, fn);
-  off = (ev: string, fn: (...args: unknown[]) => void) => super.off(ev, fn);
-}
-vi.mock('../socket/socket', () => ({ getSocket: () => mockSocket, /* ... */ }));
-```
-
-**Coverage target:** 70% lines, 80% branches on `components/`, `pages/auth/`, `context/`. (No 100% target — it incentivizes testing the wrong things.)
-
-**npm scripts (`client/package.json`):**
-
-| Script | Command |
-|---|---|
-| `test` | `vitest` |
-| `test:run` | `vitest run` |
-| `test:coverage` | `vitest run --coverage` |
-
-**SECURITY:** Tests must not commit real credentials. Use fixture data only.
+**Coverage target:** 70% lines, 80% branches on `components/`, `pages/auth/`, `context/`.
 
 ---
 
-# PHASE 11 — DevOps & Deploy
+# PHASE 11 — DEVOPS & DEPLOY
+
+---
 
 ## STEP 52 — README & Architecture Documentation
 
-Top-level `README.md` with the following sections:
-
-- **Title + tagline + tech badges** (TypeScript, Node, React, Socket.io, Redis, Neon Postgres, Drizzle ORM, TailwindCSS).
-- **Demo link** (filled in after deploy).
-- **Features** (real-time multiplayer, room codes, matchmaking queue, spectators, chat, rematches, leaderboard, two games, admin panel, guest mode).
-- **Architecture diagram** as a fenced ASCII block:
-
-```
-                  ┌─────────────┐
-                  │   Client    │  React 19 + Vite + TypeScript
-                  │  (Vercel)   │  socket.io-client (typed)
-                  └──────┬──────┘
-                         │  HTTPS REST + WSS
-                         │  (shared/ types ensure contract)
-                         ▼
-                  ┌─────────────┐
-                  │   Server    │  Express 5 + Socket.io 4 + TypeScript
-                  │  (Render)   │  Node 20 LTS, compiled to dist/
-                  └──┬───────┬──┘
-                     │       │
-            JWT auth │       │ Drizzle ORM
-                     ▼       ▼
-              ┌─────────┐ ┌──────────────┐
-              │  Redis  │ │   Postgres   │
-              │ (Cloud) │ │    (Neon)    │
-              │ Rooms,  │ │  Users,      │
-              │ Queues, │ │  Matches,    │
-              │ TTL     │ │  Stats jsonb │
-              └─────────┘ └──────────────┘
-```
-
-- **Roles & Permissions table:**
-
-| Role | Create Room | Play | Spectate | Chat | Matchmaking | Leaderboard | Admin Panel |
-|---|---|---|---|---|---|---|---|
-| Guest | yes | yes | yes | yes | yes | no | no |
-| Player | yes | yes | yes | yes | yes | yes | no |
-| Admin | yes | yes | yes | yes | yes | yes | yes |
-
-- **API Endpoints** table (HTTP method, path, auth, description).
-- **Socket Events** table (direction, name, payload).
-- **Folder Structure** (server + client + shared trees).
-- **Security** section listing all major hardening measures (matches Step 27 audit).
-- **Getting Started** (clone, env setup, install, run scripts, run tests).
-- **Environment Variables** list (server + client).
-- **Deployment** summary referencing Step 55.
-- **Architecture sequence diagrams** (login flow, room creation flow, game move flow, disconnect→reconnect flow) using Mermaid blocks.
-- **Troubleshooting** common issues (Render cold start, Redis connection refused, JWT secret too short).
-- **License** (MIT).
+Top-level `README.md` with: title + tech badges, demo link, features, architecture diagram, roles & permissions table, API endpoints table, socket events table, folder structure, security section, getting started, environment variables, deployment summary, architecture sequence diagrams (Mermaid), troubleshooting, license.
 
 ---
 
 ## STEP 53 — CI/CD (GitHub Actions: typecheck + lint + test on PR)
 
-Every PR and push to `main` runs an automated quality gate that mirrors the pre-deploy checks. A failed gate blocks merges via branch protection.
-
 **`.github/workflows/ci.yml`** — three parallel jobs:
 
 | Job | Steps |
 |---|---|
-| `server-ci` | checkout → setup-node@v4 with `node-version: 20` → `npm ci` in `server/` → `npm run typecheck` → `npm run lint` → `npm run test:run` (Step 29) → `npm run test:integration` (Step 30) |
-| `client-ci` | checkout → setup-node@v4 → `npm ci` in `client/` → `npm run typecheck` → `npm run lint` → `npm run test:run` (Step 51) → `npm run build` (verifies vite build succeeds) |
-| `shared-ci` | checkout → setup-node@v4 → `npm ci` in `shared/` → `npm run typecheck` |
+| `server-ci` | checkout -> setup-node -> `npm ci` -> typecheck -> lint -> test:run -> test:integration |
+| `client-ci` | checkout -> setup-node -> `npm ci` -> typecheck -> lint -> test:run -> build |
+| `shared-ci` | checkout -> setup-node -> `npm ci` -> typecheck |
 
-**Caching:** `actions/setup-node@v4` with `cache: 'npm'` and `cache-dependency-path` pointing to each `package-lock.json`.
+**Service containers for `server-ci`:** `postgres:16-alpine` and `redis:7-alpine`.
 
-**Service containers for `server-ci`:**
-
-```yaml
-services:
-  mongo:
-    image: mongo:7
-    ports: ['27017:27017']
-  redis:
-    image: redis:7-alpine
-    ports: ['6379:6379']
-```
-
-Integration test env vars set to `postgresql://postgres:postgres@localhost:5432/test_mpg` and `redis://localhost:6379`. The CI job declares a `services.postgres: postgres:16-alpine` container with health-check, then runs `npm run db:migrate` before `npm test` to apply the latest schema. Redis service is `services.redis: redis:7-alpine`.
-
-**`.github/workflows/deploy-preview.yml`** — on PR open/update:
-- Build client → deploy to a Vercel **Preview Deployment** (uses Vercel's GitHub integration; no extra workflow needed once the project is imported and the GitHub App is installed).
-- Comment the preview URL on the PR (the Vercel bot does this automatically).
-
-**Branch protection on `main`:**
-- Require all three CI jobs to pass.
-- Require at least 1 approving review (or 0 for solo projects).
-- Require branches to be up to date.
-- Disable force pushes.
-
-**Secret management:**
-- All real secrets (`DATABASE_URL`, `JWT_SECRET`, etc.) live only in Render/Vercel env vars — never in GitHub Actions secrets unless needed by deploy workflows. CI uses local service containers and dummy secrets.
-
-**Status badge in README:**
-
-```md
-![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)
-```
-
-**SECURITY:**
-- CI never receives production secrets — only ephemeral test-container credentials.
-- `pull_request` trigger uses `pull_request` not `pull_request_target` — forks cannot exfiltrate secrets.
-- Dependabot enabled for `npm` ecosystem on both `server/` and `client/` to surface vulnerable dependencies.
+**Branch protection on `main`:** require all three CI jobs to pass.
 
 ---
 
 ## STEP 54 — Code Cleanup & Pre-Deploy Review
 
-- Run `npm run typecheck` in **both** `server/` and `client/` — must exit 0 with zero errors. This is the definitive gate before deployment.
-- Run `npm run build` in `server/` — verify `dist/` is produced and `node dist/src/server.js` boots locally.
-- Run `npm run build` in `client/` — verify `dist/` is produced and `npm run preview` serves the SPA.
-- Remove every `console.log` that prints tokens, hashes, or user PII.
-- Remove unused imports across all files (`eslint --fix`).
-- Search for `any` and `// @ts-ignore` / `// @ts-expect-error` — eliminate or document why each remaining instance is unavoidable.
-- Sync `.env.example` (server + client) with the latest set of required keys; verify no real secrets present.
-- Run `npm audit --omit=dev` on server and client; address high-severity findings.
-- Re-run the Step 27 audit checklist top-to-bottom and mark each item.
-- Verify the Drizzle schema file (`db/schema/index.ts`) matches the latest generated migration in `drizzle/`. Run `npx drizzle-kit check` — it must report zero pending changes.
-- Verify no raw user input is interpolated inside `sql\`\`` template literals — `rg "sql\\\`.*\\$\\{" server/src` should only match `${columnName}` (column refs) or `${parameterizedVar}` (auto-bound), never string concatenation.
-- Verify no `req.query` mutations anywhere (Express 5).
-- Verify `hpp` is **not** in `package.json`.
-- Verify `shared/types/*.ts` is the single source for every wire-crossing payload — no duplicate type declarations on client and server.
-- Verify all CI jobs (Step 53) pass on the latest commit.
-- Smoke-test: register, login, guest login, create room, join with second account, play a full TicTacToe game, force a disconnect mid-game, check stat increments.
+- Run `npm run typecheck` in both `server/` and `client/` — must exit 0.
+- Run `npm run build` in both — verify outputs.
+- Remove every `console.log` that prints tokens/hashes/PII.
+- Remove unused imports. Eliminate `any` and `@ts-ignore`.
+- Sync `.env.example` files.
+- Run `npm audit --omit=dev`.
+- Re-run Step 27 audit checklist.
+- Verify Drizzle schema matches latest migration.
+- Verify no raw user input interpolated in SQL.
+- Verify all CI jobs pass.
+- Smoke-test: register, login, guest login, create room, join, play, disconnect, stats.
 
 ---
 
 ## STEP 55 — Deployment (Render + Vercel + Redis Cloud + Neon Postgres + optional Sentry)
 
 **Neon Postgres:**
-- Create project on [neon.tech](https://neon.tech) free tier (0.5 GB storage, 100 compute hours/month, autosuspend after 5 min idle).
-- Default branch is `main` — keep it for production. Optionally create a `dev` branch for staging (Neon branches share storage and are free).
-- Copy the **pooled** connection string (transaction-mode pooler, ends with `-pooler.region.aws.neon.tech`) — required because Drizzle's `postgres-js` is configured with `prepare: false`. The non-pooled connection works for `db:migrate` only.
-- Enable IP allowlist in Neon settings → for Render, add `0.0.0.0/0` (Render egress IPs are dynamic on free tier) and rely on `sslmode=require` + strong DB password for security.
-- Connection string → `DATABASE_URL` env var on Render.
+- Create project on [neon.tech](https://neon.tech) free tier.
+- Copy the **pooled** connection string (transaction-mode pooler) -> `DATABASE_URL`.
 
-**Migration on deploy** — add a Render *predeploy command* (Render dashboard → Settings → Build & Deploy):
-
+**Migration on deploy:**
 ```
 predeploy: npm --prefix server run db:migrate
 ```
 
-This applies pending migrations once before the new server instance starts handling traffic. If a migration fails, the deploy aborts and the previous version keeps serving — safe by default.
-
 **Redis Cloud:**
-- Create free-tier 30 MB DB.
-- Default user password (or rotate).
-- Connection URL → `REDIS_URL`.
+- Create free-tier 30 MB DB -> `REDIS_URL`.
 
-**Render (backend service, type = Web Service):**
-- Repo connected, root directory `server/`.
-- Build command: `npm install && npm run build` (runs `tsc` → emits `dist/`; the `shared/` folder is included via the `tsconfig.json` path mapping so it bundles into compilation).
-- Start command: `node dist/src/server.js`.
-- **Critical:** Render must have access to the `shared/` folder during build. Since `server/tsconfig.json` references `../shared`, configure Render's root directory as the **repo root** (not `server/`) and override the build/start paths: build = `cd server && npm install && npm run build`, start = `cd server && node dist/src/server.js`. Alternative: keep `server/` as root and copy `shared/` into `server/shared/` via a `prebuild` script.
-- Plan that supports **WebSockets** (Render's free Web Service does support WebSockets — confirm).
-- Env vars: every key from `.env.example` plus `JWT_SECRET` (generated, ≥ 32 chars), `NODE_ENV=production`, `CLIENT_ORIGIN=https://<your-vercel-domain>` (e.g. `https://multiplayer-game.vercel.app` — and any custom domain), `DATABASE_URL` (Neon pooled connection), `REDIS_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_USERNAME`.
-- Note on Vercel preview URLs: every PR gets a unique `*.vercel.app` subdomain. To allow them through CORS, either (a) accept all `*.vercel.app` subdomains in `corsOptions.origin` via a regex check, or (b) keep CORS strict to the production URL and rely on Vercel preview deploys hitting a separate staging Render service with its own `CLIENT_ORIGIN` regex. The simplest portfolio choice is option (a) — see Step 5 CORS notes.
+**Render (backend):**
+- Root directory: repo root.
+- Build: `cd server && npm install && npm run build`.
+- Start: `cd server && node dist/src/server.js`.
+- Env vars: all `.env.example` keys + `NODE_ENV=production`, `CLIENT_ORIGIN=https://<vercel-domain>`.
 - Health check path: `/api/health`.
-- Run admin seed once via Render Shell: `cd server && npx tsx src/seed/seedAdmin.ts` (or after build: `node dist/src/seed/seedAdmin.js`).
+- Run admin seed once via Render Shell.
 
 **Vercel (frontend):**
-- Repo connected through the Vercel dashboard → **Add New… → Project → Import Git Repository**.
-- **Root Directory:** `client/` (Vercel auto-detects Vite and uses the `client/vercel.json` we ship in the repo).
-- Framework Preset: `Vite` (auto-detected). Override only if needed:
-  - Install Command: `npm install`
-  - Build Command: `npm run build`
-  - Output Directory: `dist`
-- Node.js version: 20.x (Settings → General → Node.js Version).
-- Build runs `tsc --noEmit && vite build` from `client/package.json` — **type errors fail the deploy**, which is exactly what we want.
-- Env vars (Settings → Environment Variables, scope = Production + Preview): `VITE_API_URL=https://<render-domain>/api`, `VITE_SOCKET_URL=https://<render-domain>`.
-- SPA fallback + caching: handled by `client/vercel.json` (rewrites every path to `/index.html`, sets `Cache-Control: public, max-age=31536000, immutable` on `/assets/*`, plus `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy` headers). Committed to the repo — no dashboard config required.
-- Optional: enable **Vercel Analytics** (free tier, anonymized) for Web Vitals.
-- Optional CLI workflow: `npm i -g vercel` → `cd client && vercel link` → `vercel --prod` for a manual production deploy. Pushing to `main` is the recommended path; CLI is only for hotfixes.
+- Root directory: `client/`.
+- Framework: Vite (auto-detected).
+- Env vars: `VITE_API_URL`, `VITE_SOCKET_URL`.
+- SPA fallback + caching via `client/vercel.json`.
 
 **Post-deploy verification:**
 
 Functional:
 - [ ] Register, login, logout work end-to-end.
 - [ ] Guest entry works and guest cannot access `/profile` or `/admin`.
-- [ ] Create room, share link with a second tab, join, play TicTacToe to win/draw, stats increment for registered users only.
-- [ ] Card Game starts at 4 players, hands hidden from opponents, suit-following enforced.
-- [ ] Matchmaking pairs two registered users automatically into TicTacToe.
-- [ ] Spectator can join and sees public state only.
-- [ ] Chat sends/receives in real time; 300-char limit enforced; throttle works.
-- [ ] Disconnect mid-game → 30s grace → forfeit if no reconnect.
+- [ ] Create room, join, play TicTacToe to win/draw, stats increment.
+- [ ] Card Game starts at 4 players, hands hidden, suit-following enforced.
+- [ ] Matchmaking pairs two users automatically.
+- [ ] Spectator joins and sees public state only.
+- [ ] Chat sends/receives in real time; 300-char limit; throttle works.
+- [ ] Disconnect mid-game -> 30s grace -> forfeit if no reconnect.
 - [ ] Leaderboard reflects new wins after a game.
-- [ ] Admin panel: dashboard stats render, user role change works, last-admin protection enforced, force-close room kicks all sockets.
+- [ ] Admin panel: dashboard stats, user role change, last-admin protection, force-close room.
 
 Security:
-- [ ] CORS blocks requests from an unknown origin (test from another domain).
-- [ ] Rate limiter trips after exceeding auth limit (10/15min).
-- [ ] `helmet` headers present (`x-frame-options`, `strict-transport-security`, etc.).
-- [ ] NoSQL injection attempt (e.g., `email: { "$ne": null }` in JSON body) is sanitized — login still returns generic error.
-- [ ] XSS attempt in `displayName`, `bio`, or chat is escaped on render.
-- [ ] Role-escalation attempt via `PUT /api/auth/me` with `{ role: "admin" }` is silently dropped (whitelist).
-- [ ] WebSocket connection without a token is rejected at handshake.
-- [ ] Invalid `gameType` on `room:create` returns `error_event` with no internal details.
+- [ ] CORS blocks requests from unknown origin.
+- [ ] Rate limiter trips after exceeding auth limit.
+- [ ] `helmet` headers present.
+- [ ] Injection attempt sanitized.
+- [ ] XSS attempt escaped.
+- [ ] Role-escalation attempt silently dropped.
+- [ ] WebSocket without token rejected.
+- [ ] Invalid `gameType` returns `error_event` with no internal details.
 - [ ] Production error responses contain no stack traces.
-- [ ] `x-powered-by` header is absent.
-- [ ] `.env` is not committed; `.env.example` has no real secrets.
+- [ ] `x-powered-by` header absent.
+- [ ] `.env` not committed; `.env.example` has no real secrets.
 
 Once all checks pass, fill in the `Demo link` placeholder in `README.md`.

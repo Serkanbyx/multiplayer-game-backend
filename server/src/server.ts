@@ -30,7 +30,7 @@ import { registerSocketHandlers } from './socket/index.js';
 import { setIo } from './socket/io.js';
 
 const require = createRequire(import.meta.url);
-const { version } = require('../../package.json') as { version: string };
+const { version } = require('../package.json') as { version: string };
 
 const app = express();
 

@@ -31,7 +31,7 @@ export const ProfileHeader = ({
 
       <div className="flex-1 text-center sm:text-left">
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-center">
-          <h1 className="text-2xl font-bold text-fg">{displayName}</h1>
+          <h1 tabIndex={-1} className="text-2xl font-bold text-fg focus:outline-none">{displayName}</h1>
           <RoleBadge role={role} />
         </div>
 

@@ -20,7 +20,7 @@ const NotificationSettings = () => {
   return (
     <div className="max-w-lg space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-fg">Notifications</h1>
+        <h1 tabIndex={-1} className="text-2xl font-bold text-fg focus:outline-none">Notifications</h1>
         <p className="mt-1 text-sm text-fg-muted">
           Choose which notifications you'd like to receive.
         </p>

@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useMemo, useCallback, useEffect, useRef, useState, useId } from 'react';
 import type { CardGameState, Card, Suit } from '@mpg/shared/types/games';
 import { cn } from '../../utils/cn';
 import { useSounds } from '../../hooks/useSounds';
@@ -246,6 +246,9 @@ export const CardGameTable = memo(
     }, [currentTrick, players, getRelativePosition]);
 
     const gameOver = result !== null;
+    const suitHintId = useId();
+    const [focusedCardIndex, setFocusedCardIndex] = useState(0);
+    const cardButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const handleCardClick = useCallback(
       (card: Card, el: HTMLElement | null) => {
@@ -264,8 +267,41 @@ export const CardGameTable = memo(
       [isMyTurn, gameOver, play, onPlayCard, cardRectsMap],
     );
 
+    /* Arrow key navigation within the hand */
+    const handleHandKeyDown = useCallback(
+      (e: React.KeyboardEvent, index: number) => {
+        if (!myHand) return;
+        let nextIndex = index;
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            nextIndex = index > 0 ? index - 1 : myHand.length - 1;
+            break;
+          case 'ArrowRight':
+            nextIndex = index < myHand.length - 1 ? index + 1 : 0;
+            break;
+          default:
+            return;
+        }
+
+        if (nextIndex !== index) {
+          e.preventDefault();
+          setFocusedCardIndex(nextIndex);
+          cardButtonRefs.current[nextIndex]?.focus();
+        }
+      },
+      [myHand],
+    );
+
     return (
       <div className="flex w-full max-w-3xl flex-col items-center">
+        {/* Screen-reader-only suit hint */}
+        {mustFollowSuit && leadSuit && (
+          <p id={suitHintId} className="sr-only">
+            You must follow suit: {leadSuit}. Cards of other suits cannot be played.
+          </p>
+        )}
+
         {/* ── Felt table ── */}
         <div className="relative w-full aspect-16/10 overflow-hidden rounded-2xl border-4 border-emerald-950 bg-linear-to-br from-emerald-700 to-emerald-900 shadow-2xl">
           {/* Subtle radial highlight */}
@@ -373,7 +409,11 @@ export const CardGameTable = memo(
 
         {/* ── My hand (fanned cards) ── */}
         {myHand && myHand.length > 0 && (
-          <div className="relative -mt-4 flex items-end justify-center pb-2">
+          <div
+            className="relative -mt-4 flex items-end justify-center pb-2"
+            role="group"
+            aria-label="Your hand"
+          >
             {myHand.map((card, i) => {
               const n = myHand.length;
               const mid = (n - 1) / 2;
@@ -395,14 +435,22 @@ export const CardGameTable = memo(
                   }}
                 >
                   <button
-                    ref={(el) => captureCardRect(cardKey, el)}
+                    ref={(el) => {
+                      captureCardRect(cardKey, el);
+                      cardButtonRefs.current[i] = el;
+                    }}
                     type="button"
+                    tabIndex={focusedCardIndex === i ? 0 : -1}
                     onClick={(e) =>
                       canPlay && handleCardClick(card, e.currentTarget)
                     }
-                    disabled={!isMyTurn || gameOver}
+                    onKeyDown={(e) => handleHandKeyDown(e, i)}
+                    aria-label={`Card: ${card.rank} of ${card.suit}`}
+                    aria-disabled={!canPlay}
+                    aria-describedby={dimmed ? suitHintId : undefined}
                     className={cn(
                       'relative flex h-20 w-14 flex-col items-center justify-center rounded-lg border-2 bg-white shadow-lg transition-all duration-200 select-none',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2',
                       card.suit === '♥' || card.suit === '♦'
                         ? 'text-red-600'
                         : 'text-slate-900',
@@ -413,7 +461,6 @@ export const CardGameTable = memo(
                           : 'cursor-not-allowed border-gray-300',
                     )}
                     style={{ marginTop: `${lift}px` }}
-                    aria-label={`${card.rank} of ${card.suit}`}
                   >
                     <span className="text-sm font-bold leading-none">{card.rank}</span>
                     <span className="text-lg leading-none">{card.suit}</span>

@@ -4,7 +4,7 @@ import { Home } from 'lucide-react';
 const NotFoundPage = () => {
   return (
     <div className="mx-auto max-w-md px-4 py-24 text-center">
-      <h1 className="text-6xl font-bold text-primary">404</h1>
+      <h1 tabIndex={-1} className="text-6xl font-bold text-primary focus:outline-none">404</h1>
       <p className="mt-4 text-lg text-fg-muted">Page not found.</p>
       <Link
         to="/"

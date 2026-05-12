@@ -74,7 +74,7 @@ const LeaderboardPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-fg">Leaderboard</h1>
+          <h1 tabIndex={-1} className="text-3xl font-bold tracking-tight text-fg focus:outline-none">Leaderboard</h1>
           <p className="mt-1 text-fg-muted">
             Top players ranked by wins.
             {pagination && (

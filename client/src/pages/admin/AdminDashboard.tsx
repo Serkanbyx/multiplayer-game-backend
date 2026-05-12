@@ -58,7 +58,7 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-fg">Dashboard</h1>
+        <h1 tabIndex={-1} className="text-2xl font-bold text-fg focus:outline-none">Dashboard</h1>
         <p className="mt-1 text-sm text-fg-muted">Overview of platform statistics.</p>
       </div>
 

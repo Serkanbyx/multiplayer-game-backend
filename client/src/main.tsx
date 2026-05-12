@@ -20,6 +20,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               toastOptions={{
                 className: '!bg-surface !text-fg !border !border-border',
                 duration: 3000,
+                ariaProps: { role: 'status', 'aria-live': 'polite' },
+                success: {
+                  ariaProps: { role: 'status', 'aria-live': 'polite' },
+                },
+                error: {
+                  ariaProps: { role: 'alert', 'aria-live': 'assertive' },
+                },
               }}
             />
           </SocketProvider>

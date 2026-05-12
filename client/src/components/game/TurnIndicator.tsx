@@ -23,6 +23,7 @@ export const TurnIndicator = memo(
 
     return (
       <div
+        role="status"
         className={cn(
           'rounded-lg px-4 py-3 text-center text-lg font-semibold transition-all',
           gameOver && 'bg-surface text-fg-muted',

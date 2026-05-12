@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useCallback } from 'react';
+import { memo, useEffect, useRef, useCallback, useState } from 'react';
 import type { TicTacToeState } from '@mpg/shared/types/games';
 import { cn } from '../../utils/cn';
 import { useSounds } from '../../hooks/useSounds';
@@ -8,6 +8,11 @@ type TicTacToeBoardProps = TicTacToeState & {
   mySymbol: 'X' | 'O' | null;
   onPlay: (index: number) => void;
 };
+
+const toRowCol = (index: number) => ({
+  row: Math.floor(index / 3),
+  col: index % 3,
+});
 
 export const TicTacToeBoard = memo(
   ({
@@ -24,7 +29,9 @@ export const TicTacToeBoard = memo(
     const { play } = useSounds();
     const prevTurnRef = useRef(currentTurnUserId);
     const prevResultRef = useRef(result);
-    const prevBoardRef = useRef<(string | null)[]>(board);
+    const prevBoardRef = useRef<readonly (string | null)[]>(board);
+    const cellRefs = useRef<(HTMLButtonElement | null)[]>(new Array(9).fill(null));
+    const [focusedIndex, setFocusedIndex] = useState(0);
 
     /* Sound: turn change */
     useEffect(() => {
@@ -64,7 +71,41 @@ export const TicTacToeBoard = memo(
       [play, onPlay],
     );
 
+    /* Arrow key navigation within the 3×3 grid */
+    const handleGridKeyDown = useCallback(
+      (e: React.KeyboardEvent, index: number) => {
+        const { row, col } = toRowCol(index);
+        let nextIndex = index;
+
+        switch (e.key) {
+          case 'ArrowUp':
+            nextIndex = row > 0 ? (row - 1) * 3 + col : index;
+            break;
+          case 'ArrowDown':
+            nextIndex = row < 2 ? (row + 1) * 3 + col : index;
+            break;
+          case 'ArrowLeft':
+            nextIndex = col > 0 ? row * 3 + (col - 1) : index;
+            break;
+          case 'ArrowRight':
+            nextIndex = col < 2 ? row * 3 + (col + 1) : index;
+            break;
+          default:
+            return;
+        }
+
+        if (nextIndex !== index) {
+          e.preventDefault();
+          setFocusedIndex(nextIndex);
+          cellRefs.current[nextIndex]?.focus();
+        }
+      },
+      [],
+    );
+
     const isGameWon = result === 'win' && winningLine && winningLine.length > 0;
+
+    const rows = [board.slice(0, 3), board.slice(3, 6), board.slice(6, 9)];
 
     return (
       <div className="flex flex-col items-center gap-4">
@@ -75,38 +116,48 @@ export const TicTacToeBoard = memo(
         )}
 
         <div
-          className="grid grid-cols-3 gap-2"
           role="grid"
-          aria-label="Tic Tac Toe board"
+          aria-label="TicTacToe game board"
         >
-          {board.map((cell, i) => {
-            const isWinCell = winningLine?.includes(i) ?? false;
-            const isClickable = isMyTurn && cell === null && result === null;
-            const isNew = newCellIndexes.current.has(i);
+          {rows.map((row, rowIdx) => (
+            <div key={rowIdx} role="row" className="flex gap-2 mb-2 last:mb-0">
+              {row.map((cell, colIdx) => {
+                const i = rowIdx * 3 + colIdx;
+                const isWinCell = winningLine?.includes(i) ?? false;
+                const canPlay = isMyTurn && cell === null && result === null;
+                const isNew = newCellIndexes.current.has(i);
+                const cellLabel = `Row ${rowIdx + 1}, Column ${colIdx + 1}, ${cell ?? 'empty'}`;
 
-            return (
-              <button
-                key={i}
-                onClick={() => isClickable && handleCellClick(i)}
-                disabled={!isClickable}
-                className={cn(
-                  'flex h-20 w-20 items-center justify-center rounded-lg border-2 text-3xl font-bold transition-all',
-                  isClickable
-                    ? 'cursor-pointer hover:bg-surface/80 hover:scale-105'
-                    : 'cursor-not-allowed',
-                  isWinCell
-                    ? 'border-primary bg-primary/20 text-primary animate-win-pulse'
-                    : 'border-border bg-surface',
-                  cell === 'X' && !isWinCell && 'text-info',
-                  cell === 'O' && !isWinCell && 'text-danger',
-                  isNew && cell !== null && 'animate-piece-drop',
-                )}
-                aria-label={`Cell ${i + 1}: ${cell ?? 'empty'}`}
-              >
-                {cell}
-              </button>
-            );
-          })}
+                return (
+                  <button
+                    key={i}
+                    ref={(el) => { cellRefs.current[i] = el; }}
+                    role="gridcell"
+                    tabIndex={focusedIndex === i ? 0 : -1}
+                    onClick={() => canPlay && handleCellClick(i)}
+                    onKeyDown={(e) => handleGridKeyDown(e, i)}
+                    aria-label={cellLabel}
+                    aria-disabled={!canPlay}
+                    className={cn(
+                      'flex h-20 w-20 items-center justify-center rounded-lg border-2 text-3xl font-bold transition-all',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+                      canPlay
+                        ? 'cursor-pointer hover:bg-surface/80 hover:scale-105'
+                        : 'cursor-not-allowed',
+                      isWinCell
+                        ? 'border-primary bg-primary/20 text-primary animate-win-pulse'
+                        : 'border-border bg-surface',
+                      cell === 'X' && !isWinCell && 'text-info',
+                      cell === 'O' && !isWinCell && 'text-danger',
+                      isNew && cell !== null && 'animate-piece-drop',
+                    )}
+                  >
+                    {cell}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     );

@@ -7,6 +7,7 @@ import {
   RegisteredOnlyRoute,
 } from './components/guards';
 import { useAnimations } from './hooks/useAnimations';
+import { usePageFocus } from './hooks/usePageFocus';
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -34,6 +35,9 @@ function App() {
 
   /* Keeps no-animations class on <html> in sync with preference + system */
   useAnimations();
+
+  /* Focus <h1> on route change for screen reader announcement */
+  usePageFocus();
 
   return (
     <div key={location.pathname} className="animate-page-fade">

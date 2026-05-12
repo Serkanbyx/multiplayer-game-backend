@@ -123,6 +123,9 @@ export const ChatPanel = memo(({ messages, onSend, mySelfUserId, throttledUntil 
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        aria-live="polite"
+        aria-atomic="false"
+        aria-label="Chat messages"
         className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
         style={{ minHeight: 200, maxHeight: 400 }}
       >
@@ -148,7 +151,9 @@ export const ChatPanel = memo(({ messages, onSend, mySelfUserId, throttledUntil 
           </p>
         )}
         <div className="flex items-center gap-2">
+          <label htmlFor="chat-input" className="sr-only">Chat message</label>
           <input
+            id="chat-input"
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}

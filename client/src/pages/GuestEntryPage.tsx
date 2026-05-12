@@ -50,7 +50,7 @@ const GuestEntryPage = () => {
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <Card>
-        <h1 className="text-2xl font-bold text-fg text-center">Play as Guest</h1>
+        <h1 tabIndex={-1} className="text-2xl font-bold text-fg text-center focus:outline-none">Play as Guest</h1>
         <p className="mt-1 text-sm text-fg-muted text-center">
           Jump straight into a game — no account needed
         </p>

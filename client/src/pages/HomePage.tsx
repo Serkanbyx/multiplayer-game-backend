@@ -177,7 +177,7 @@ const HomePage = () => {
     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* ── Hero ── */}
       <section className="text-center space-y-3">
-        <h1 className="text-4xl font-extrabold tracking-tight text-fg">
+        <h1 tabIndex={-1} className="text-4xl font-extrabold tracking-tight text-fg focus:outline-none">
           Welcome back, <span className="text-primary">{displayName}</span>
         </h1>
         <p className="text-fg-muted text-lg">

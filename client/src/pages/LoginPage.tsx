@@ -51,7 +51,7 @@ const LoginPage = () => {
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <Card>
-        <h1 className="text-2xl font-bold text-fg text-center">Welcome Back</h1>
+        <h1 tabIndex={-1} className="text-2xl font-bold text-fg text-center focus:outline-none">Welcome Back</h1>
         <p className="mt-1 text-sm text-fg-muted text-center">
           Sign in to continue playing
         </p>

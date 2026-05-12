@@ -125,7 +125,7 @@ const AdminUsers = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-fg">Users</h1>
+        <h1 tabIndex={-1} className="text-2xl font-bold text-fg focus:outline-none">Users</h1>
         <p className="mt-1 text-sm text-fg-muted">Manage all platform users.</p>
       </div>
 

@@ -311,7 +311,7 @@ cd client && npm run dev
 1. **Register** a new account or **continue as guest** for instant play
 2. **Create a room** by selecting a game type (Tic-Tac-Toe or Card Game) and visibility (public/private)
 3. **Share the room code** with a friend or wait for someone to join
-4. **Toggle ready** and the host starts the game when all players are ready
+4. **Game starts automatically** as soon as the room is full (no ready/start handshake)
 5. **Play in real time** — moves, turn indicators, and timers are synchronized via WebSocket
 6. **Chat** with your opponent during the game using the built-in chat panel
 7. **Request a rematch** after the game ends or return to lobby
@@ -417,8 +417,6 @@ On disconnect, the server starts a grace period timer. The player's `user:room:{
 | `room:create`          | `{ gameType, isPrivate }`    | Create a new game room       |
 | `room:join`            | `{ roomCode, asSpectator? }` | Join an existing room        |
 | `room:leave`           | —                            | Leave the current room       |
-| `room:ready`           | —                            | Toggle ready status          |
-| `room:start`           | —                            | Host starts the game         |
 | `room:spectate`        | `{ roomCode }`               | Join room as spectator       |
 | `game:action`          | `GameAction`                 | Submit a game move           |
 | `game:rematch-request` | —                            | Request a rematch            |

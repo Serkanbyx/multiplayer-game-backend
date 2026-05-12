@@ -167,6 +167,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [state, login, register, loginAsGuest, logout, updateUser, isAdmin, isGuest],
   );
 
+  /* Suppress FOUC: do not render dependent providers/UI until auth is hydrated.
+     Otherwise unauthenticated layout flashes briefly for already-logged-in users. */
+  if (state.loading) {
+    return (
+      <AuthContext.Provider value={value}>
+        <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          className="flex min-h-screen items-center justify-center bg-bg"
+        >
+          <span className="sr-only">Loading session…</span>
+          <div
+            aria-hidden="true"
+            className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary"
+          />
+        </div>
+      </AuthContext.Provider>
+    );
+  }
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 

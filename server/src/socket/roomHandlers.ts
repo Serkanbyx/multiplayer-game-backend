@@ -211,23 +211,7 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
     }
   });
 
-  /* ── room:ready ─────────────────────────────────────────────── */
-
-  socket.on('room:ready', () => {
-    try {
-      // TODO: Step 15 — toggle ready state
-    } catch {
-      socket.emit('error', { code: 'ROOM_READY_FAILED', message: 'Failed to toggle ready' });
-    }
-  });
-
-  /* ── room:start ─────────────────────────────────────────────── */
-
-  socket.on('room:start', () => {
-    try {
-      // TODO: Step 15 — host starts game
-    } catch {
-      socket.emit('error', { code: 'ROOM_START_FAILED', message: 'Failed to start game' });
-    }
-  });
+  /* Note: there is no room:ready / room:start handshake.
+     The game starts automatically inside `room:join` once player count reaches
+     `maxPlayers` (see startGame() call above). */
 };

@@ -21,7 +21,7 @@ const GAME_FILTER_OPTIONS: { value: GameFilter; label: string }[] = [
 const ITEMS_PER_PAGE = 25;
 
 const calculateWinRate = (stats: GameStats): string => {
-  if (stats.gamesPlayed === 0) return '0%';
+  if (stats.gamesPlayed === 0) return '0.0%';
   return `${((stats.wins / stats.gamesPlayed) * 100).toFixed(1)}%`;
 };
 

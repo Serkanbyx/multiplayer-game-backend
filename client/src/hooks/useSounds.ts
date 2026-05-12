@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { usePreferences } from '../context/PreferencesContext';
 
 type SoundName = 'click' | 'turn' | 'move' | 'win' | 'lose' | 'draw' | 'chat' | 'match-found';
@@ -14,32 +14,46 @@ const SOUND_PATHS: Record<SoundName, string> = {
   'match-found': '/sounds/match-found.mp3',
 };
 
+/* Module-scoped cache: single Audio instance per sound, shared across every
+   useSounds() consumer. Previously each component instantiated its own
+   HTMLAudioElement, causing N parallel network fetches for the same file. */
+const audioCache: Map<SoundName, HTMLAudioElement> = new Map();
+let preloaded = false;
+
+const preloadAll = (): void => {
+  if (preloaded || typeof window === 'undefined') return;
+  preloaded = true;
+  for (const name of Object.keys(SOUND_PATHS) as SoundName[]) {
+    if (!audioCache.has(name)) {
+      const audio = new Audio(SOUND_PATHS[name]);
+      audio.preload = 'auto';
+      audioCache.set(name, audio);
+    }
+  }
+};
+
+const getAudio = (name: SoundName): HTMLAudioElement => {
+  let audio = audioCache.get(name);
+  if (!audio) {
+    audio = new Audio(SOUND_PATHS[name]);
+    audio.preload = 'auto';
+    audioCache.set(name, audio);
+  }
+  return audio;
+};
+
 export const useSounds = () => {
   const { preferences } = usePreferences();
-  const cacheRef = useRef<Map<SoundName, HTMLAudioElement>>(new Map());
 
   useEffect(() => {
-    const entries = Object.entries(SOUND_PATHS) as [SoundName, string][];
-    for (const [name, path] of entries) {
-      if (!cacheRef.current.has(name)) {
-        const audio = new Audio(path);
-        audio.preload = 'auto';
-        cacheRef.current.set(name, audio);
-      }
-    }
+    preloadAll();
   }, []);
 
   const play = useCallback(
     (name: SoundName, volumeOverride?: number): void => {
       if (!preferences.sounds) return;
 
-      let audio = cacheRef.current.get(name);
-      if (!audio) {
-        audio = new Audio(`/sounds/${name}.mp3`);
-        audio.preload = 'auto';
-        cacheRef.current.set(name, audio);
-      }
-
+      const audio = getAudio(name);
       audio.currentTime = 0;
       audio.volume = volumeOverride ?? preferences.soundVolume ?? 0.7;
       void audio.play().catch(() => {

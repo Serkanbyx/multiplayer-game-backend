@@ -13,8 +13,6 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; room?: Room; error?: string }) => void,
   ) => void;
   "room:leave": () => void;
-  "room:ready": () => void;
-  "room:start": () => void;
   "room:spectate": (
     data: { roomCode: string },
     callback: (response: { success: boolean; room?: Room; error?: string }) => void,

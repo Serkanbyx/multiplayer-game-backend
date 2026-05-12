@@ -2,12 +2,11 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { GameType } from '@mpg/shared/types/games';
-import type { Room } from '@mpg/shared/types/room';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useSocketEvent } from '../hooks/useSocketEvent';
 import { useSounds } from '../hooks/useSounds';
-import { getActiveRooms } from '../api/adminService';
+import { getActiveRooms, type ActiveRoom } from '../api/adminService';
 import {
   Button,
   Card,
@@ -57,7 +56,7 @@ const HomePage = () => {
   const [estimatedWait, setEstimatedWait] = useState<number | null>(null);
 
   /* ── Public rooms (admin only) ── */
-  const [publicRooms, setPublicRooms] = useState<Room[]>([]);
+  const [publicRooms, setPublicRooms] = useState<ActiveRoom[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
 
   /* ── Socket event listeners ── */
@@ -107,9 +106,7 @@ const HomePage = () => {
     setIsLoadingRooms(true);
     getActiveRooms()
       .then((rooms) => {
-        const openRooms = rooms.filter(
-          (r) => !r.isPrivate && r.status === 'waiting' && r.players.length < r.maxPlayers,
-        );
+        const openRooms = rooms.filter((r) => r.status === 'waiting');
         setPublicRooms(openRooms);
       })
       .catch(() => {
@@ -347,7 +344,7 @@ const HomePage = () => {
                   </div>
 
                   <div className="text-sm text-fg-muted">
-                    {room.players.length}/{room.maxPlayers} players
+                    {room.playerCount} player{room.playerCount !== 1 ? 's' : ''}
                   </div>
 
                   <Button

@@ -79,7 +79,7 @@ const GameRoomPage = () => {
   /* ── Derived values ── */
   const iAmPlayer = room?.players.some((p) => p.userId === mySelfUserId) ?? false;
   const isMyTurn = currentTurnUserId === mySelfUserId;
-  const statusConfig = STATUS_CONFIG[room?.status ?? ''] ?? STATUS_CONFIG.waiting;
+  const statusConfig = STATUS_CONFIG[room?.status ?? ''] ?? { label: 'Waiting', variant: 'warning' as const };
   const isPlaying = room?.status === 'playing';
 
   /* ── Start/stop opponent disconnect countdown ── */

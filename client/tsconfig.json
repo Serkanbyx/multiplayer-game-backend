@@ -6,7 +6,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": { "@mpg/shared/*": ["../shared/*"] },
-    "types": ["vite/client"]
+    "types": ["vite/client", "@testing-library/jest-dom/vitest"]
   },
   "include": ["src", "../shared"]
 }

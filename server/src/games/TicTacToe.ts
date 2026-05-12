@@ -44,7 +44,7 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
   getStateFor(_userId: string | null): TicTacToeState {
     return {
       gameType: 'tictactoe',
-      board: this.board as TicTacToeBoard,
+      board: this.board as unknown as TicTacToeBoard,
       currentTurnUserId: this.players[this.currentTurnIndex]!.userId,
       players: this.players.map((p) => ({ userId: p.userId, displayName: p.displayName, symbol: p.symbol })),
       winner: this.winner,
@@ -112,8 +112,8 @@ export class TicTacToe extends BaseGame<TicTacToeState> {
     return {
       stateChanged: true,
       gameOver: this.result !== null,
-      result: this.result ?? undefined,
-      winnerId: this.winner ?? undefined,
+      ...(this.result !== null && { result: this.result }),
+      ...(this.winner !== null && { winnerId: this.winner }),
     };
   }
 

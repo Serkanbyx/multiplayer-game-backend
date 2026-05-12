@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import http from 'node:http';
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import compression from 'compression';
@@ -29,8 +29,9 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@mpg/shared/typ
 import { registerSocketHandlers } from './socket/index.js';
 import { setIo } from './socket/io.js';
 
-const require = createRequire(import.meta.url);
-const { version } = require('../package.json') as { version: string };
+const { version } = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
+) as { version: string };
 
 const app = express();
 

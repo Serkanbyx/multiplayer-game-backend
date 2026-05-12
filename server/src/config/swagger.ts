@@ -1,7 +1,9 @@
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
-const require = createRequire(import.meta.url);
-const { version } = require('../../package.json') as { version: string };
+const { version } = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
+) as { version: string };
 
 const bearerAuth: Record<string, unknown> = {
   type: 'http',

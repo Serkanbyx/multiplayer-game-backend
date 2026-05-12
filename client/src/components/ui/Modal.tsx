@@ -108,7 +108,7 @@ export const Modal = ({
         ref={modalRef}
         className={cn(
           'relative z-10 w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-xl',
-          'animate-in fade-in zoom-in-95',
+          'animate-modal-in',
           className,
         )}
       >

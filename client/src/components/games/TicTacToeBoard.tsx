@@ -24,6 +24,7 @@ export const TicTacToeBoard = memo(
     const { play } = useSounds();
     const prevTurnRef = useRef(currentTurnUserId);
     const prevResultRef = useRef(result);
+    const prevBoardRef = useRef<(string | null)[]>(board);
 
     /* Sound: turn change */
     useEffect(() => {
@@ -43,6 +44,18 @@ export const TicTacToeBoard = memo(
       prevResultRef.current = result;
     }, [result, winner, mySymbol, players, play]);
 
+    /* Track which cells are newly placed for piece-drop animation */
+    const newCellIndexes = useRef(new Set<number>());
+    useEffect(() => {
+      const prev = prevBoardRef.current;
+      const fresh = new Set<number>();
+      board.forEach((cell, i) => {
+        if (cell !== null && prev[i] === null) fresh.add(i);
+      });
+      newCellIndexes.current = fresh;
+      prevBoardRef.current = board;
+    }, [board]);
+
     const handleCellClick = useCallback(
       (index: number) => {
         play('click');
@@ -50,6 +63,8 @@ export const TicTacToeBoard = memo(
       },
       [play, onPlay],
     );
+
+    const isGameWon = result === 'win' && winningLine && winningLine.length > 0;
 
     return (
       <div className="flex flex-col items-center gap-4">
@@ -67,6 +82,7 @@ export const TicTacToeBoard = memo(
           {board.map((cell, i) => {
             const isWinCell = winningLine?.includes(i) ?? false;
             const isClickable = isMyTurn && cell === null && result === null;
+            const isNew = newCellIndexes.current.has(i);
 
             return (
               <button
@@ -79,10 +95,11 @@ export const TicTacToeBoard = memo(
                     ? 'cursor-pointer hover:bg-surface/80 hover:scale-105'
                     : 'cursor-not-allowed',
                   isWinCell
-                    ? 'border-primary bg-primary/20 text-primary animate-pulse'
+                    ? 'border-primary bg-primary/20 text-primary animate-win-pulse'
                     : 'border-border bg-surface',
                   cell === 'X' && !isWinCell && 'text-info',
                   cell === 'O' && !isWinCell && 'text-danger',
+                  isNew && cell !== null && 'animate-piece-drop',
                 )}
                 aria-label={`Cell ${i + 1}: ${cell ?? 'empty'}`}
               >

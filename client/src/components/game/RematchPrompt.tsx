@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
 import type { RoomPlayer } from '@mpg/shared/types/room';
 import { Button } from '../ui/Button';
 
@@ -28,6 +28,17 @@ export const RematchPrompt = memo(
     onRequest,
     onDecline,
   }: RematchPromptProps) => {
+    const [isDismissing, setIsDismissing] = useState(false);
+
+    const handleDecline = useCallback(() => {
+      setIsDismissing(true);
+      const timeout = setTimeout(() => {
+        setIsDismissing(false);
+        onDecline();
+      }, 200);
+      return () => clearTimeout(timeout);
+    }, [onDecline]);
+
     if (!visible) return null;
 
     const alreadyVoted = rematchVotes.includes(mySelfUserId);
@@ -44,9 +55,14 @@ export const RematchPrompt = memo(
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-hidden="true" />
+        <div
+          className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity ${isDismissing ? 'opacity-0' : 'opacity-100'}`}
+          aria-hidden="true"
+        />
 
-        <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center shadow-xl space-y-5">
+        <div
+          className={`relative z-10 w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center shadow-xl space-y-5 ${isDismissing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        >
           <h2 className="text-2xl font-bold text-fg">{resultText}</h2>
 
           {/* Vote status per player */}
@@ -74,7 +90,7 @@ export const RematchPrompt = memo(
                 {alreadyVoted ? 'Waiting for others…' : 'Rematch'}
               </Button>
             )}
-            <Button variant="secondary" onClick={onDecline} className="w-full">
+            <Button variant="secondary" onClick={handleDecline} className="w-full">
               Back to Home
             </Button>
           </div>

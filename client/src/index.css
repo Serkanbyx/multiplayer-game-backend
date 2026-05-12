@@ -12,10 +12,76 @@
   --color-fg: #f1f5f9;
   --color-fg-muted: #94a3b8;
   --color-border: #334155;
+
+  /* Animation tokens */
+  --animate-piece-drop: piece-drop 200ms ease-out;
+  --animate-card-flip: card-flip 300ms ease-in-out;
+  --animate-card-deal: card-deal 300ms ease-out;
+  --animate-win-pulse: win-pulse 1s ease-in-out 3;
+  --animate-toast-in: toast-in 200ms ease-out;
+  --animate-toast-out: toast-out 150ms ease-in forwards;
+  --animate-modal-in: modal-in 250ms ease-out;
+  --animate-modal-out: modal-out 200ms ease-in forwards;
+  --animate-page-fade: page-fade 200ms ease-out;
+}
+
+@keyframes piece-drop {
+  from { opacity: 0; transform: scale(0.3); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes card-flip {
+  0%   { transform: perspective(600px) rotateY(90deg); opacity: 0; }
+  100% { transform: perspective(600px) rotateY(0deg); opacity: 1; }
+}
+
+@keyframes card-deal {
+  from { opacity: 0; transform: translateY(-30px) scale(0.8); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes win-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50%      { transform: scale(1.08); box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.6); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(100%); }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes modal-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.9) translateY(10px); }
+}
+
+@keyframes page-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @media (prefers-color-scheme: light) {
   :root { color-scheme: light; }
+}
+
+/* Disable all animations when user preference or system prefers-reduced-motion */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
 }
 
 .font-size-small  { font-size: 14px; }

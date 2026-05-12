@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
+import { memo, useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CardGameState, Card, Suit } from '@mpg/shared/types/games';
 import { cn } from '../../utils/cn';
 import { useSounds } from '../../hooks/useSounds';
@@ -29,10 +29,16 @@ const PlayingCard = ({
   card,
   size = 'md',
   className,
+  animateFlip = false,
+  animateDealDelay,
+  trickWin = false,
 }: {
   card: Card;
   size?: 'sm' | 'md';
   className?: string;
+  animateFlip?: boolean;
+  animateDealDelay?: number;
+  trickWin?: boolean;
 }) => {
   const isRed = card.suit === '♥' || card.suit === '♦';
   return (
@@ -41,8 +47,16 @@ const PlayingCard = ({
         'relative flex flex-col items-center justify-center rounded-lg border bg-white shadow-md select-none',
         size === 'sm' ? 'h-14 w-10 text-xs' : 'h-20 w-14 text-sm',
         isRed ? 'text-red-600 border-red-200' : 'text-slate-900 border-gray-300',
+        animateFlip && 'animate-card-flip',
+        trickWin && 'animate-win-pulse',
+        typeof animateDealDelay === 'number' && 'animate-card-deal',
         className,
       )}
+      style={
+        typeof animateDealDelay === 'number'
+          ? { animationDelay: `${animateDealDelay}ms` }
+          : undefined
+      }
     >
       <span className="font-bold leading-none">{card.rank}</span>
       <span className={cn('leading-none', size === 'sm' ? 'text-sm' : 'text-lg')}>
@@ -117,6 +131,50 @@ export const CardGameTable = memo(
     const prevTurnRef = useRef(currentTurnUserId);
     const prevResultRef = useRef(result);
 
+    /* ── Deal animation: detect first load of hand ── */
+    const hasDealtRef = useRef(false);
+    const [isDealPhase, setIsDealPhase] = useState(false);
+    useEffect(() => {
+      if (myHand && myHand.length > 0 && !hasDealtRef.current) {
+        hasDealtRef.current = true;
+        setIsDealPhase(true);
+        const timeout = setTimeout(
+          () => setIsDealPhase(false),
+          myHand.length * 50 + 300,
+        );
+        return () => clearTimeout(timeout);
+      }
+    }, [myHand]);
+
+    /* ── Trick win detection ── */
+    const prevTrickNumberRef = useRef(trickNumber);
+    const [trickWinUserId, setTrickWinUserId] = useState<string | null>(null);
+    useEffect(() => {
+      if (trickNumber > prevTrickNumberRef.current && currentTrick.length === 0) {
+        const lastTurnUser = prevTurnRef.current;
+        if (lastTurnUser) {
+          setTrickWinUserId(lastTurnUser);
+          const timeout = setTimeout(() => setTrickWinUserId(null), 800);
+          prevTrickNumberRef.current = trickNumber;
+          return () => clearTimeout(timeout);
+        }
+      }
+      prevTrickNumberRef.current = trickNumber;
+    }, [trickNumber, currentTrick.length]);
+
+    /* ── FLIP: track card positions for play animation ── */
+    const cardRefsMap = useRef<Map<string, HTMLElement>>(new Map());
+    const cardRectsMap = useRef<Map<string, DOMRect>>(new Map());
+    const captureCardRect = useCallback((cardKey: string, el: HTMLElement | null) => {
+      if (el) {
+        cardRefsMap.current.set(cardKey, el);
+        cardRectsMap.current.set(cardKey, el.getBoundingClientRect());
+      } else {
+        cardRefsMap.current.delete(cardKey);
+        cardRectsMap.current.delete(cardKey);
+      }
+    }, []);
+
     /* Sound: turn change */
     useEffect(() => {
       if (prevTurnRef.current && prevTurnRef.current !== currentTurnUserId) {
@@ -190,12 +248,20 @@ export const CardGameTable = memo(
     const gameOver = result !== null;
 
     const handleCardClick = useCallback(
-      (card: Card) => {
+      (card: Card, el: HTMLElement | null) => {
         if (!isMyTurn || gameOver) return;
+
+        /* Capture position before card leaves hand for FLIP */
+        if (el) {
+          const key = `${card.suit}-${card.rank}`;
+          const prevRect = el.getBoundingClientRect();
+          cardRectsMap.current.set(key, prevRect);
+        }
+
         play('click');
         onPlayCard(card);
       },
-      [isMyTurn, gameOver, play, onPlayCard],
+      [isMyTurn, gameOver, play, onPlayCard, cardRectsMap],
     );
 
     return (
@@ -282,9 +348,22 @@ export const CardGameTable = memo(
             <div className="grid w-36 grid-cols-3 grid-rows-3 place-items-center gap-1">
               {(['top', 'left', 'right', 'bottom'] as const).map((pos) => {
                 const card = trickCardsByRelPos.get(pos);
+                const trickEntry = currentTrick.find((e) => {
+                  const p = players.find((pl) => pl.userId === e.userId);
+                  return p && getRelativePosition(p.position) === pos;
+                });
+                const isWinningCard =
+                  trickWinUserId && trickEntry?.userId === trickWinUserId;
                 return (
                   <div key={pos} className={TRICK_POSITION_CLASSES[pos]}>
-                    {card && <PlayingCard card={card} size="sm" />}
+                    {card && (
+                      <PlayingCard
+                        card={card}
+                        size="sm"
+                        animateFlip
+                        trickWin={!!isWinningCard}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -302,20 +381,25 @@ export const CardGameTable = memo(
               const lift = Math.abs(i - mid) * 3;
               const dimmed = isCardDimmed(card);
               const canPlay = isMyTurn && !gameOver && !dimmed;
+              const cardKey = `${card.suit}-${card.rank}`;
 
               return (
                 <div
-                  key={`${card.suit}-${card.rank}`}
-                  className="-ml-3 first:ml-0"
+                  key={cardKey}
+                  className={cn('-ml-3 first:ml-0', isDealPhase && 'animate-card-deal')}
                   style={{
                     transform: `rotate(${angle}deg)`,
                     transformOrigin: 'bottom center',
                     zIndex: i,
+                    ...(isDealPhase ? { animationDelay: `${i * 50}ms`, animationFillMode: 'backwards' } : {}),
                   }}
                 >
                   <button
+                    ref={(el) => captureCardRect(cardKey, el)}
                     type="button"
-                    onClick={() => canPlay && handleCardClick(card)}
+                    onClick={(e) =>
+                      canPlay && handleCardClick(card, e.currentTarget)
+                    }
                     disabled={!isMyTurn || gameOver}
                     className={cn(
                       'relative flex h-20 w-14 flex-col items-center justify-center rounded-lg border-2 bg-white shadow-lg transition-all duration-200 select-none',

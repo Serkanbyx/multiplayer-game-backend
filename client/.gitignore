@@ -5,5 +5,8 @@ dist/
 *.log
 stats.html
 
+# Test coverage
+coverage/
+
 # Vercel CLI artifacts
 .vercel/

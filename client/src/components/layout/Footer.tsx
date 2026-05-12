@@ -13,6 +13,27 @@ export const Footer = () => {
           </div>
           <p className="text-xs">Built with React, Node.js & Socket.IO</p>
         </div>
+
+        <div className="mt-4 flex items-center justify-center gap-1 text-xs text-fg-muted">
+          <span>Created by</span>
+          <a
+            href="https://serkanbayraktar.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:text-primary/80 transition-colors font-medium"
+          >
+            Serkanby
+          </a>
+          <span>|</span>
+          <a
+            href="https://github.com/Serkanbyx"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:text-primary/80 transition-colors font-medium"
+          >
+            Github
+          </a>
+        </div>
       </div>
     </footer>
   );

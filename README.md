@@ -2,6 +2,9 @@
 
 > Real-time multiplayer game platform with room management, matchmaking, spectators, chat, and leaderboard.
 
+[![Created by Serkanby](https://img.shields.io/badge/Created%20by-Serkanby-blue?style=flat-square)](https://serkanbayraktar.com/)
+[![GitHub](https://img.shields.io/badge/GitHub-Serkanbyx-181717?style=flat-square&logo=github)](https://github.com/Serkanbyx)
+
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20_LTS-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -558,3 +561,19 @@ Ensure `CLIENT_ORIGIN` in your server `.env` exactly matches the client URL (inc
 ## License
 
 [PolyForm Noncommercial 1.0.0](./LICENSE) — Free for non-commercial use. See [LICENSE](./LICENSE) for details.
+
+---
+
+## Developer
+
+**Serkanby**
+
+- Website: [serkanbayraktar.com](https://serkanbayraktar.com/)
+- GitHub: [@Serkanbyx](https://github.com/Serkanbyx)
+- Email: [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
+
+## Contact
+
+- [Open an Issue](https://github.com/Serkanbyx/s5.1_Multiplayer-Game-Backend/issues)
+- Email: [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
+- Website: [serkanbayraktar.com](https://serkanbayraktar.com/)

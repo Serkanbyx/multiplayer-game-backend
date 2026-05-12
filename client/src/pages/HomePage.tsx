@@ -131,7 +131,7 @@ const HomePage = () => {
   };
 
   const handleJoinRoom = () => {
-    const code = joinRoomCode.trim().toUpperCase();
+    const code = joinRoomCode.trim().toLowerCase();
     if (!code) return toast.error('Please enter a room code.');
     if (!isConnected) return toast.error('Not connected to server.');
     setIsJoining(true);
@@ -245,9 +245,9 @@ const HomePage = () => {
 
           <Input
             label="Room Code"
-            placeholder="e.g. ABC123"
+            placeholder="e.g. a3f1b2c4"
             value={joinRoomCode}
-            onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase())}
+            onChange={(e) => setJoinRoomCode(e.target.value.toLowerCase())}
             onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
             maxLength={10}
             disabled={isJoining}

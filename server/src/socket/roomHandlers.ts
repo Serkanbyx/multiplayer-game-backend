@@ -69,23 +69,24 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
         return callback({ success: false, error: 'Room code is required' });
       }
 
+      const normalizedCode = data.roomCode.toLowerCase();
       const existingRoomCode = await roomService.getUserRoom(userId);
       if (existingRoomCode) {
-        if (existingRoomCode === data.roomCode) {
-          const room = await roomService.getRoom(data.roomCode);
+        if (existingRoomCode === normalizedCode) {
+          const room = await roomService.getRoom(normalizedCode);
           if (room) {
-            socket.join(socketRoomChannel(data.roomCode));
+            socket.join(socketRoomChannel(normalizedCode));
 
             const isPlayer = room.players.some((p) => p.userId === userId);
             if (isPlayer) {
-              cancelGraceTimer(data.roomCode, userId);
-              const updatedRoom = await roomService.updateRoom(data.roomCode, (current) => ({
+              cancelGraceTimer(normalizedCode, userId);
+              const updatedRoom = await roomService.updateRoom(normalizedCode, (current) => ({
                 ...current,
                 players: current.players.map((p) =>
                   p.userId === userId ? { ...p, isConnected: true } : p,
                 ),
               }));
-              io.in(socketRoomChannel(data.roomCode)).emit('room:updated', updatedRoom);
+              io.in(socketRoomChannel(normalizedCode)).emit('room:updated', updatedRoom);
               return callback({ success: true, room: updatedRoom });
             }
 
@@ -95,7 +96,7 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
         return callback({ success: false, error: 'You are already in a room' });
       }
 
-      const room = await roomService.getRoom(data.roomCode);
+      const room = await roomService.getRoom(normalizedCode);
       if (!room) {
         socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
         return callback({ success: false, error: 'Room not found' });
@@ -104,23 +105,23 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
       /* ── Spectator path ─────────────────────────────────────── */
       if (data.asSpectator) {
         const spectator = buildSpectator(socket);
-        const updatedRoom = await roomService.addSpectator(data.roomCode, spectator);
+        const updatedRoom = await roomService.addSpectator(normalizedCode, spectator);
 
-        socket.join(socketRoomChannel(data.roomCode));
-        io.in(socketRoomChannel(data.roomCode)).emit('room:updated', updatedRoom);
+        socket.join(socketRoomChannel(normalizedCode));
+        io.in(socketRoomChannel(normalizedCode)).emit('room:updated', updatedRoom);
 
         return callback({ success: true, room: updatedRoom });
       }
 
       /* ── Player path ────────────────────────────────────────── */
       const player = buildPlayer(socket, room.players.length);
-      const updatedRoom = await roomService.addPlayer(data.roomCode, player);
+      const updatedRoom = await roomService.addPlayer(normalizedCode, player);
 
-      socket.join(socketRoomChannel(data.roomCode));
+      socket.join(socketRoomChannel(normalizedCode));
 
-      socket.to(socketRoomChannel(data.roomCode)).emit('room:player-joined', player);
+      socket.to(socketRoomChannel(normalizedCode)).emit('room:player-joined', player);
 
-      io.in(socketRoomChannel(data.roomCode)).emit('room:updated', updatedRoom);
+      io.in(socketRoomChannel(normalizedCode)).emit('room:updated', updatedRoom);
 
       callback({ success: true, room: updatedRoom });
 
@@ -128,7 +129,7 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
         updatedRoom.players.length >= updatedRoom.maxPlayers &&
         updatedRoom.status === 'waiting'
       ) {
-        await startGame(io, data.roomCode);
+        await startGame(io, normalizedCode);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to join room';
@@ -184,21 +185,22 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
         return callback({ success: false, error: 'Room code is required' });
       }
 
+      const spectateCode = data.roomCode.toLowerCase();
       const existingRoom = await roomService.getUserRoom(userId);
       if (existingRoom) {
         return callback({ success: false, error: 'You are already in a room' });
       }
 
-      const room = await roomService.getRoom(data.roomCode);
+      const room = await roomService.getRoom(spectateCode);
       if (!room) {
         socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
         return callback({ success: false, error: 'Room not found' });
       }
 
       const spectator = buildSpectator(socket);
-      const updatedRoom = await roomService.addSpectator(data.roomCode, spectator);
+      const updatedRoom = await roomService.addSpectator(spectateCode, spectator);
 
-      socket.join(socketRoomChannel(data.roomCode));
+      socket.join(socketRoomChannel(spectateCode));
       socket.emit('room:updated', updatedRoom);
 
       callback({ success: true, room: updatedRoom });

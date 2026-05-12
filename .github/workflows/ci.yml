@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-ci:
+    name: Server CI
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_mpg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_mpg
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_test_jwt_secret_at_least_32_characters_long_value
+      GUEST_JWT_EXPIRES_IN: 2h
+      CLIENT_ORIGIN: http://localhost:5173
+      BCRYPT_SALT_ROUNDS: 10
+      LOG_LEVEL: error
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: server
+
+      - name: Lint
+        run: npm run --if-present lint
+        working-directory: server
+
+      - name: Unit tests
+        run: npm run test:run
+        working-directory: server
+
+      - name: Run migrations
+        run: npm run db:migrate
+        working-directory: server
+
+      - name: Integration tests
+        run: npm run test:integration
+        working-directory: server
+
+  client-ci:
+    name: Client CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: client
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: client
+
+      - name: Lint
+        run: npm run --if-present lint
+        working-directory: client
+
+      - name: Unit tests
+        run: npm run test:run
+        working-directory: client
+
+      - name: Build
+        run: npm run build
+        working-directory: client
+
+  shared-ci:
+    name: Shared CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: shared/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: shared
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: shared

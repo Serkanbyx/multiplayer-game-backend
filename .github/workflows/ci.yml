@@ -56,12 +56,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install -g npm@11 && npm ci
         working-directory: server
 
       - name: Typecheck
@@ -93,12 +93,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install -g npm@11 && npm ci
         working-directory: client
 
       - name: Typecheck
@@ -126,12 +126,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: shared/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install -g npm@11 && npm ci
         working-directory: shared
 
       - name: Typecheck

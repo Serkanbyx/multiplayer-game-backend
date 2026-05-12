@@ -74,14 +74,33 @@ const PlayerSlot = ({
   tricksWon,
   isCurrentTurn,
   position,
+  compact = false,
 }: {
   displayName: string;
   handCount: number;
   tricksWon: number;
   isCurrentTurn: boolean;
   position: RelativePosition;
+  compact?: boolean;
 }) => {
   const isHorizontal = position === 'left' || position === 'right';
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 transition-colors',
+          isCurrentTurn ? 'bg-yellow-400/20 ring-2 ring-yellow-400/60' : 'bg-black/30',
+        )}
+      >
+        <Avatar name={displayName} size="xs" className="bg-white/20 text-white" />
+        <span className="max-w-[48px] truncate text-[10px] text-white/70">{handCount}</span>
+        {isCurrentTurn && (
+          <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -329,53 +348,101 @@ export const CardGameTable = memo(
 
           {/* ── Top player ── */}
           {topPlayer && (
-            <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
-              <PlayerSlot
-                displayName={topPlayer.displayName}
-                handCount={topPlayer.handCount}
-                tricksWon={topPlayer.tricksWon}
-                isCurrentTurn={currentTurnUserId === topPlayer.userId}
-                position="top"
-              />
+            <div className="absolute left-1/2 top-2 md:top-3 z-10 -translate-x-1/2">
+              <div className="hidden md:block">
+                <PlayerSlot
+                  displayName={topPlayer.displayName}
+                  handCount={topPlayer.handCount}
+                  tricksWon={topPlayer.tricksWon}
+                  isCurrentTurn={currentTurnUserId === topPlayer.userId}
+                  position="top"
+                />
+              </div>
+              <div className="md:hidden">
+                <PlayerSlot
+                  displayName={topPlayer.displayName}
+                  handCount={topPlayer.handCount}
+                  tricksWon={topPlayer.tricksWon}
+                  isCurrentTurn={currentTurnUserId === topPlayer.userId}
+                  position="top"
+                  compact
+                />
+              </div>
             </div>
           )}
 
           {/* ── Left player ── */}
           {leftPlayer && (
-            <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2">
-              <PlayerSlot
-                displayName={leftPlayer.displayName}
-                handCount={leftPlayer.handCount}
-                tricksWon={leftPlayer.tricksWon}
-                isCurrentTurn={currentTurnUserId === leftPlayer.userId}
-                position="left"
-              />
+            <div className="absolute left-1 md:left-3 top-1/2 z-10 -translate-y-1/2">
+              <div className="hidden md:block">
+                <PlayerSlot
+                  displayName={leftPlayer.displayName}
+                  handCount={leftPlayer.handCount}
+                  tricksWon={leftPlayer.tricksWon}
+                  isCurrentTurn={currentTurnUserId === leftPlayer.userId}
+                  position="left"
+                />
+              </div>
+              <div className="md:hidden">
+                <PlayerSlot
+                  displayName={leftPlayer.displayName}
+                  handCount={leftPlayer.handCount}
+                  tricksWon={leftPlayer.tricksWon}
+                  isCurrentTurn={currentTurnUserId === leftPlayer.userId}
+                  position="left"
+                  compact
+                />
+              </div>
             </div>
           )}
 
           {/* ── Right player ── */}
           {rightPlayer && (
-            <div className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
-              <PlayerSlot
-                displayName={rightPlayer.displayName}
-                handCount={rightPlayer.handCount}
-                tricksWon={rightPlayer.tricksWon}
-                isCurrentTurn={currentTurnUserId === rightPlayer.userId}
-                position="right"
-              />
+            <div className="absolute right-1 md:right-3 top-1/2 z-10 -translate-y-1/2">
+              <div className="hidden md:block">
+                <PlayerSlot
+                  displayName={rightPlayer.displayName}
+                  handCount={rightPlayer.handCount}
+                  tricksWon={rightPlayer.tricksWon}
+                  isCurrentTurn={currentTurnUserId === rightPlayer.userId}
+                  position="right"
+                />
+              </div>
+              <div className="md:hidden">
+                <PlayerSlot
+                  displayName={rightPlayer.displayName}
+                  handCount={rightPlayer.handCount}
+                  tricksWon={rightPlayer.tricksWon}
+                  isCurrentTurn={currentTurnUserId === rightPlayer.userId}
+                  position="right"
+                  compact
+                />
+              </div>
             </div>
           )}
 
           {/* ── Bottom player info (me) ── */}
           {myPlayer && (
-            <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
-              <PlayerSlot
-                displayName={myPlayer.displayName}
-                handCount={myPlayer.handCount}
-                tricksWon={myPlayer.tricksWon}
-                isCurrentTurn={isMyTurn}
-                position="bottom"
-              />
+            <div className="absolute bottom-2 md:bottom-3 left-1/2 z-10 -translate-x-1/2">
+              <div className="hidden md:block">
+                <PlayerSlot
+                  displayName={myPlayer.displayName}
+                  handCount={myPlayer.handCount}
+                  tricksWon={myPlayer.tricksWon}
+                  isCurrentTurn={isMyTurn}
+                  position="bottom"
+                />
+              </div>
+              <div className="md:hidden">
+                <PlayerSlot
+                  displayName={myPlayer.displayName}
+                  handCount={myPlayer.handCount}
+                  tricksWon={myPlayer.tricksWon}
+                  isCurrentTurn={isMyTurn}
+                  position="bottom"
+                  compact
+                />
+              </div>
             </div>
           )}
 
@@ -410,7 +477,7 @@ export const CardGameTable = memo(
         {/* ── My hand (fanned cards) ── */}
         {myHand && myHand.length > 0 && (
           <div
-            className="relative -mt-4 flex items-end justify-center pb-2"
+            className="relative -mt-4 flex items-end justify-center pb-2 overflow-x-auto md:overflow-x-visible"
             role="group"
             aria-label="Your hand"
           >
@@ -449,7 +516,7 @@ export const CardGameTable = memo(
                     aria-disabled={!canPlay}
                     aria-describedby={dimmed ? suitHintId : undefined}
                     className={cn(
-                      'relative flex h-20 w-14 flex-col items-center justify-center rounded-lg border-2 bg-white shadow-lg transition-all duration-200 select-none',
+                      'relative flex h-12 w-9 md:h-20 md:w-14 flex-col items-center justify-center rounded-lg border-2 bg-white shadow-lg transition-all duration-200 select-none',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2',
                       card.suit === '♥' || card.suit === '♦'
                         ? 'text-red-600'
@@ -462,8 +529,8 @@ export const CardGameTable = memo(
                     )}
                     style={{ marginTop: `${lift}px` }}
                   >
-                    <span className="text-sm font-bold leading-none">{card.rank}</span>
-                    <span className="text-lg leading-none">{card.suit}</span>
+                    <span className="text-xs md:text-sm font-bold leading-none">{card.rank}</span>
+                    <span className="text-sm md:text-lg leading-none">{card.suit}</span>
                   </button>
                 </div>
               );

@@ -107,7 +107,9 @@ export const Modal = ({
       <div
         ref={modalRef}
         className={cn(
-          'relative z-10 w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-xl',
+          'relative z-10 w-full bg-surface shadow-xl',
+          'max-sm:min-h-screen max-sm:rounded-none max-sm:border-0 max-sm:p-5',
+          'sm:max-w-lg sm:rounded-lg sm:border sm:border-border sm:p-6',
           'animate-modal-in',
           className,
         )}

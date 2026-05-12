@@ -175,7 +175,7 @@ export const Navbar = () => {
           {/* Mobile hamburger */}
           <button
             onClick={() => setMobileOpen((prev) => !prev)}
-            className="md:hidden p-2 text-fg-muted hover:text-fg transition-colors"
+            className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-fg-muted hover:text-fg transition-colors"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -193,7 +193,7 @@ export const Navbar = () => {
               onClick={closeMobile}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary'
                     : 'text-fg-muted hover:text-fg hover:bg-white/5',
@@ -208,7 +208,7 @@ export const Navbar = () => {
               onClick={closeMobile}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary'
                     : 'text-fg-muted hover:text-fg hover:bg-white/5',
@@ -237,7 +237,7 @@ export const Navbar = () => {
                   <Link
                     to="/profile"
                     onClick={closeMobile}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
                   >
                     <User className="h-4 w-4" />
                     My Profile
@@ -247,7 +247,7 @@ export const Navbar = () => {
                   <Link
                     to="/settings"
                     onClick={closeMobile}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
                   >
                     <Settings className="h-4 w-4" />
                     Settings
@@ -257,7 +257,7 @@ export const Navbar = () => {
                   <Link
                     to="/admin"
                     onClick={closeMobile}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
                   >
                     <ShieldCheck className="h-4 w-4" />
                     Admin
@@ -265,7 +265,7 @@ export const Navbar = () => {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger hover:bg-white/5 transition-colors"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-danger hover:bg-white/5 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
                   Logout
@@ -276,7 +276,7 @@ export const Navbar = () => {
                 <Link
                   to="/login"
                   onClick={closeMobile}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
                 >
                   <LogIn className="h-4 w-4" />
                   Login
@@ -284,7 +284,7 @@ export const Navbar = () => {
                 <Link
                   to="/register"
                   onClick={closeMobile}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
                 >
                   <UserPlus className="h-4 w-4" />
                   Register
@@ -292,7 +292,7 @@ export const Navbar = () => {
                 <Link
                   to="/guest"
                   onClick={closeMobile}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-fg-muted hover:text-fg hover:bg-white/5 transition-colors"
                 >
                   <Gamepad2 className="h-4 w-4" />
                   Play as Guest

@@ -161,73 +161,121 @@ const AdminUsers = () => {
       ) : users.length === 0 ? (
         <EmptyState heading="No users found" description="Try adjusting your search or filter." />
       ) : (
-        <Card className="overflow-hidden p-0!">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface/50">
-                  <th className="px-4 py-3 font-medium text-fg-muted">User</th>
-                  <th className="px-4 py-3 font-medium text-fg-muted">Email</th>
-                  <th className="px-4 py-3 font-medium text-fg-muted">Role</th>
-                  <th className="px-4 py-3 font-medium text-fg-muted text-right">Games Played</th>
-                  <th className="px-4 py-3 font-medium text-fg-muted">Last Login</th>
-                  <th className="px-4 py-3 font-medium text-fg-muted text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="border-b border-border/50 last:border-0 hover:bg-surface/30 transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar src={u.avatarUrl} name={u.displayName || u.username} size="sm" lazy />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-fg">{u.displayName || u.username}</p>
-                          <p className="truncate text-xs text-fg-muted">@{u.username}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-fg-muted truncate max-w-[180px]">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <RoleBadge role={u.role} />
-                    </td>
-                    <td className="px-4 py-3 text-fg text-right tabular-nums">
-                      {u.stats?.gamesPlayed ?? 0}
-                    </td>
-                    <td className="px-4 py-3 text-fg-muted text-sm">
-                      {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={isSelf(u.id)}
-                          onClick={() => openRoleModal(u)}
-                        >
-                          Change Role
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          disabled={isSelf(u.id)}
-                          onClick={() => setDeleteModalUser(u)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile card rows */}
+          <div className="space-y-3 md:hidden">
+            {users.map((u) => (
+              <Card key={u.id} className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Avatar src={u.avatarUrl} name={u.displayName || u.username} size="sm" lazy />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-fg">{u.displayName || u.username}</p>
+                    <p className="truncate text-xs text-fg-muted">@{u.username}</p>
+                  </div>
+                  <RoleBadge role={u.role} />
+                </div>
+
+                <div className="flex items-center justify-between text-sm text-fg-muted">
+                  <span className="truncate max-w-[160px]">{u.email}</span>
+                  <span className="tabular-nums">{u.stats?.gamesPlayed ?? 0} games</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-fg-muted">
+                    {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : '—'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={isSelf(u.id)}
+                      onClick={() => openRoleModal(u)}
+                    >
+                      Role
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={isSelf(u.id)}
+                      onClick={() => setDeleteModalUser(u)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
+
+          {/* Desktop table */}
+          <Card className="hidden md:block overflow-hidden p-0!">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface/50">
+                    <th className="px-4 py-3 font-medium text-fg-muted">User</th>
+                    <th className="px-4 py-3 font-medium text-fg-muted">Email</th>
+                    <th className="px-4 py-3 font-medium text-fg-muted">Role</th>
+                    <th className="px-4 py-3 font-medium text-fg-muted text-right">Games Played</th>
+                    <th className="px-4 py-3 font-medium text-fg-muted">Last Login</th>
+                    <th className="px-4 py-3 font-medium text-fg-muted text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr
+                      key={u.id}
+                      className="border-b border-border/50 last:border-0 hover:bg-surface/30 transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar src={u.avatarUrl} name={u.displayName || u.username} size="sm" lazy />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-fg">{u.displayName || u.username}</p>
+                            <p className="truncate text-xs text-fg-muted">@{u.username}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted truncate max-w-[180px]">{u.email}</td>
+                      <td className="px-4 py-3">
+                        <RoleBadge role={u.role} />
+                      </td>
+                      <td className="px-4 py-3 text-fg text-right tabular-nums">
+                        {u.stats?.gamesPlayed ?? 0}
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted text-sm">
+                        {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={isSelf(u.id)}
+                            onClick={() => openRoleModal(u)}
+                          >
+                            Change Role
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            disabled={isSelf(u.id)}
+                            onClick={() => setDeleteModalUser(u)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <div className="flex items-center justify-between px-1 py-3">
               <p className="text-sm text-fg-muted">
                 Showing {(pagination.page - 1) * pagination.limit + 1}–
                 {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
@@ -258,7 +306,7 @@ const AdminUsers = () => {
               </div>
             </div>
           )}
-        </Card>
+        </>
       )}
 
       {/* Change Role Modal */}

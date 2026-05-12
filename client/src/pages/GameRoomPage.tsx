@@ -15,7 +15,9 @@ import {
   ChatPanel,
   GameBoardFrame,
   RematchPrompt,
+  MobileTabBar,
 } from '../components/game';
+import type { MobileTab } from '../components/game';
 
 /* ── Status pill variant map ── */
 const STATUS_CONFIG: Record<
@@ -69,6 +71,10 @@ const GameRoomPage = () => {
 
   const hasJoinedRef = useRef(false);
   const mySelfUserId = user?._id ?? '';
+
+  /* ── Mobile tab navigation ── */
+  const [mobileTab, setMobileTab] = useState<MobileTab>('game');
+  const [unreadChat, setUnreadChat] = useState(false);
 
   /* ── Derived values ── */
   const iAmPlayer = room?.players.some((p) => p.userId === mySelfUserId) ?? false;
@@ -299,8 +305,9 @@ const GameRoomPage = () => {
         timestamp: new Date(data.timestamp).getTime(),
       };
       setChat((prev) => [...prev, newMsg]);
+      if (mobileTab !== 'chat') setUnreadChat(true);
     },
-    [],
+    [mobileTab],
   );
 
   const handleRematchRequested = useCallback(
@@ -408,6 +415,11 @@ const GameRoomPage = () => {
     navigate('/');
   }, [navigate]);
 
+  const handleMobileTabChange = useCallback((tab: MobileTab) => {
+    setMobileTab(tab);
+    if (tab === 'chat') setUnreadChat(false);
+  }, []);
+
   const handleCopyRoomCode = useCallback(async () => {
     if (!roomCode) return;
     try {
@@ -494,10 +506,17 @@ const GameRoomPage = () => {
         </div>
       </header>
 
-      {/* ── 3-column layout ── */}
+      {/* ── Mobile tab bar (< lg) ── */}
+      <MobileTabBar
+        activeTab={mobileTab}
+        onTabChange={handleMobileTabChange}
+        unreadChat={unreadChat}
+      />
+
+      {/* ── 3-column layout (desktop) / tab-switched panels (mobile) ── */}
       <div className="grid gap-6 lg:grid-cols-[260px_1fr_300px]">
         {/* ── Left column: Players & Spectators ── */}
-        <aside className="space-y-6">
+        <aside className={`space-y-6 ${mobileTab === 'players' ? 'block' : 'hidden'} lg:block`}>
           <PlayerList
             players={room.players}
             currentTurnUserId={currentTurnUserId}
@@ -508,7 +527,7 @@ const GameRoomPage = () => {
         </aside>
 
         {/* ── Center column: Game Board ── */}
-        <main className="space-y-4">
+        <main className={`space-y-4 ${mobileTab === 'game' ? 'block' : 'hidden'} lg:block`}>
           <TurnIndicator
             currentPlayerId={currentTurnUserId}
             mySelfUserId={mySelfUserId}
@@ -559,7 +578,7 @@ const GameRoomPage = () => {
         </main>
 
         {/* ── Right column: Chat ── */}
-        <aside>
+        <aside className={`${mobileTab === 'chat' ? 'block' : 'hidden'} lg:block`}>
           <ChatPanel
             messages={chat}
             onSend={handleSendChat}

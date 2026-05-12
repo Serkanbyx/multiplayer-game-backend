@@ -20,8 +20,8 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-8 w-8 text-sm',
-  md: 'h-10 w-10',
+  sm: 'h-8 w-8 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 text-sm',
+  md: 'h-10 w-10 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0',
   lg: 'h-12 w-12 text-lg',
 };
 

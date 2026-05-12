@@ -108,7 +108,7 @@ export const TicTacToeBoard = memo(
     const rows = [board.slice(0, 3), board.slice(3, 6), board.slice(6, 9)];
 
     return (
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-4 w-[90vw] max-w-[320px] lg:w-[480px] lg:max-w-[480px]">
         {mySymbol && (
           <p className="text-sm text-fg-muted">
             You are <span className="font-bold text-fg">{mySymbol}</span>
@@ -118,9 +118,10 @@ export const TicTacToeBoard = memo(
         <div
           role="grid"
           aria-label="TicTacToe game board"
+          className="w-full"
         >
           {rows.map((row, rowIdx) => (
-            <div key={rowIdx} role="row" className="flex gap-2 mb-2 last:mb-0">
+            <div key={rowIdx} role="row" className="flex gap-2 mb-2 last:mb-0 justify-center">
               {row.map((cell, colIdx) => {
                 const i = rowIdx * 3 + colIdx;
                 const isWinCell = winningLine?.includes(i) ?? false;
@@ -139,7 +140,7 @@ export const TicTacToeBoard = memo(
                     aria-label={cellLabel}
                     aria-disabled={!canPlay}
                     className={cn(
-                      'flex h-20 w-20 items-center justify-center rounded-lg border-2 text-3xl font-bold transition-all',
+                      'flex aspect-square w-[calc((100%-1rem)/3)] lg:h-[152px] lg:w-[152px] items-center justify-center rounded-lg border-2 text-3xl lg:text-4xl font-bold transition-all',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
                       canPlay
                         ? 'cursor-pointer hover:bg-surface/80 hover:scale-105'

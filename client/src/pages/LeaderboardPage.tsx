@@ -120,8 +120,55 @@ const LeaderboardPage = () => {
         </Card>
       ) : (
         <>
-          {/* Table */}
-          <div className="overflow-x-auto rounded-lg border border-border">
+          {/* Mobile card rows */}
+          <div className="space-y-3 md:hidden">
+            {computedRows.map(({ entry, rank, stats, winRate }) => (
+              <Card key={entry.id} className="flex items-center gap-3 p-4">
+                <span
+                  className={
+                    rank <= 3
+                      ? 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ' +
+                        (rank === 1
+                          ? 'bg-yellow-400/20 text-yellow-500'
+                          : rank === 2
+                            ? 'bg-gray-300/20 text-gray-400'
+                            : 'bg-amber-600/20 text-amber-600')
+                      : 'inline-flex h-8 w-8 shrink-0 items-center justify-center text-fg-muted font-medium'
+                  }
+                >
+                  {rank}
+                </span>
+
+                <Link
+                  to={`/u/${entry.username}`}
+                  className="flex items-center gap-3 min-w-0 flex-1 group"
+                >
+                  <Avatar
+                    src={entry.avatarUrl}
+                    name={entry.displayName}
+                    size="sm"
+                    lazy
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-fg group-hover:text-primary transition-colors">
+                      {entry.displayName}
+                    </p>
+                    <p className="truncate text-xs text-fg-muted">@{entry.username}</p>
+                  </div>
+                </Link>
+
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold text-fg">{winRate}</p>
+                  <p className="text-xs text-fg-muted">
+                    {stats.wins}W · {stats.losses}L · {stats.draws}D
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface/50">
@@ -154,7 +201,6 @@ const LeaderboardPage = () => {
                       key={entry.id}
                       className="bg-surface transition-colors hover:bg-surface/70"
                     >
-                      {/* Rank */}
                       <td className="px-4 py-3">
                         <span
                           className={
@@ -171,8 +217,6 @@ const LeaderboardPage = () => {
                           {rank}
                         </span>
                       </td>
-
-                      {/* Player */}
                       <td className="px-4 py-3">
                         <Link
                           to={`/u/${entry.username}`}
@@ -194,8 +238,6 @@ const LeaderboardPage = () => {
                           </div>
                         </Link>
                       </td>
-
-                      {/* Stats */}
                       <td className="px-4 py-3 text-center font-medium text-success">
                         {stats.wins}
                       </td>

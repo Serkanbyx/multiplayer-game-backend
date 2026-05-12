@@ -21,8 +21,8 @@ const buttonVariants = ({ variant, size }: { variant: Variant; size: Size }): st
     danger:    'bg-danger text-white hover:bg-danger/90',
   };
   const sizes: Record<Size, string> = {
-    sm: 'h-8 px-3 text-sm',
-    md: 'h-10 px-4',
+    sm: 'h-8 min-h-[44px] sm:min-h-0 px-3 text-sm',
+    md: 'h-10 min-h-[44px] sm:min-h-0 px-4',
     lg: 'h-12 px-6 text-lg',
   };
   return cn(

@@ -1,9 +1,10 @@
 import { useCallback, useEffect } from 'react';
 import { usePreferences } from '../context/PreferencesContext';
+import { playSynthSound, type SynthSoundName } from '../utils/soundSynth';
 
-type SoundName = 'click' | 'turn' | 'move' | 'win' | 'lose' | 'draw' | 'chat' | 'match-found';
+export type SoundName = SynthSoundName;
 
-const SOUND_PATHS: Record<SoundName, string> = {
+const MP3_SOUNDS: Partial<Record<SoundName, string>> = {
   click: '/sounds/click.mp3',
   turn: '/sounds/turn.mp3',
   move: '/sounds/move.mp3',
@@ -14,30 +15,28 @@ const SOUND_PATHS: Record<SoundName, string> = {
   'match-found': '/sounds/match-found.mp3',
 };
 
-/* Module-scoped cache: single Audio instance per sound, shared across every
-   useSounds() consumer. Previously each component instantiated its own
-   HTMLAudioElement, causing N parallel network fetches for the same file. */
-const audioCache: Map<SoundName, HTMLAudioElement> = new Map();
+const SYNTH_ONLY_SOUNDS = new Set<SoundName>(['hit', 'miss', 'sunk', 'deploy']);
+
+const audioCache: Map<string, HTMLAudioElement> = new Map();
 let preloaded = false;
 
 const preloadAll = (): void => {
   if (preloaded || typeof window === 'undefined') return;
   preloaded = true;
-  for (const name of Object.keys(SOUND_PATHS) as SoundName[]) {
-    if (!audioCache.has(name)) {
-      const audio = new Audio(SOUND_PATHS[name]);
-      audio.preload = 'auto';
-      audioCache.set(name, audio);
-    }
+  for (const path of Object.values(MP3_SOUNDS)) {
+    if (!path || audioCache.has(path)) continue;
+    const audio = new Audio(path);
+    audio.preload = 'auto';
+    audioCache.set(path, audio);
   }
 };
 
-const getAudio = (name: SoundName): HTMLAudioElement => {
-  let audio = audioCache.get(name);
+const getAudio = (path: string): HTMLAudioElement => {
+  let audio = audioCache.get(path);
   if (!audio) {
-    audio = new Audio(SOUND_PATHS[name]);
+    audio = new Audio(path);
     audio.preload = 'auto';
-    audioCache.set(name, audio);
+    audioCache.set(path, audio);
   }
   return audio;
 };
@@ -53,11 +52,24 @@ export const useSounds = () => {
     (name: SoundName, volumeOverride?: number): void => {
       if (!preferences.sounds) return;
 
-      const audio = getAudio(name);
+      const volume = volumeOverride ?? preferences.soundVolume ?? 0.7;
+
+      if (SYNTH_ONLY_SOUNDS.has(name)) {
+        playSynthSound(name, volume);
+        return;
+      }
+
+      const path = MP3_SOUNDS[name];
+      if (!path) {
+        playSynthSound(name, volume);
+        return;
+      }
+
+      const audio = getAudio(path);
       audio.currentTime = 0;
-      audio.volume = volumeOverride ?? preferences.soundVolume ?? 0.7;
+      audio.volume = volume;
       void audio.play().catch(() => {
-        /* autoplay policy may block — silent fail */
+        playSynthSound(name, volume);
       });
     },
     [preferences.sounds, preferences.soundVolume],

@@ -315,7 +315,11 @@ const GameRoomPage = () => {
   const handleGameStateUpdated = useCallback(
     (data: { roomCode: string; gameState: GameState }) => {
       setGameState((prev) => {
-        if (prev && data.gameState.currentTurnUserId === mySelfUserId) {
+        if (
+          prev &&
+          data.gameState.gameType === 'tictactoe' &&
+          data.gameState.currentTurnUserId === mySelfUserId
+        ) {
           play('move');
         }
         return data.gameState;
@@ -328,11 +332,11 @@ const GameRoomPage = () => {
   const handleGameTurn = useCallback(
     (data: { roomCode: string; currentPlayerId: string }) => {
       setCurrentTurnUserId(data.currentPlayerId);
-      if (data.currentPlayerId === mySelfUserId) {
+      if (data.currentPlayerId === mySelfUserId && room?.gameType === 'tictactoe') {
         play('turn');
       }
     },
-    [mySelfUserId, play],
+    [mySelfUserId, play, room?.gameType],
   );
 
   const handleGameEnded = useCallback(

@@ -1,13 +1,15 @@
-import { memo, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import type {
   BattleshipState,
   BattleshipShipType,
   BattleshipOrientation,
   BattleshipCell,
   BattleshipShotCell,
+  BattleshipLastShot,
 } from '@mpg/shared/types/games';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/Button';
+import { useSounds } from '../../hooks/useSounds';
 
 type BattleshipBoardProps = BattleshipState & {
   isMyTurn: boolean;
@@ -99,6 +101,12 @@ export const BattleshipBoard = memo(
     onPlaceShip,
     onFire,
   }: BattleshipBoardProps) => {
+    const { play } = useSounds();
+    const prevLastShotRef = useRef<BattleshipLastShot | null>(null);
+    const prevPhaseRef = useRef(phase);
+    const prevOwnShipsLenRef = useRef(ownShips.length);
+    const prevIsMyTurnRef = useRef(isMyTurn);
+
     const [selectedShip, setSelectedShip] = useState<BattleshipShipType | null>(
       shipsToPlace[0] ?? null,
     );
@@ -118,6 +126,56 @@ export const BattleshipBoard = memo(
     const isBattlePhase = phase === 'battle';
     const iAmReady = me?.ready ?? false;
     const canPlace = isPlacementPhase && !iAmReady && isMyTurn;
+
+    useEffect(() => {
+      if (phase === 'battle' && prevPhaseRef.current === 'placement') {
+        play('deploy');
+      }
+      prevPhaseRef.current = phase;
+    }, [phase, play]);
+
+    useEffect(() => {
+      if (!lastShot || lastShot === prevLastShotRef.current) return;
+
+      if (lastShot.shooterId === mySelfUserId) {
+        if (lastShot.sunkShip) play('sunk');
+        else if (lastShot.hit) play('hit');
+        else play('miss');
+      } else {
+        if (lastShot.hit) play('hit', 0.45);
+        else play('miss', 0.35);
+      }
+      prevLastShotRef.current = lastShot;
+    }, [lastShot, mySelfUserId, play]);
+
+    useEffect(() => {
+      if (canPlace && ownShips.length > prevOwnShipsLenRef.current) {
+        play('click', 0.45);
+      }
+      prevOwnShipsLenRef.current = ownShips.length;
+    }, [ownShips.length, canPlace, play]);
+
+    useEffect(() => {
+      if (isBattlePhase && isMyTurn && !prevIsMyTurnRef.current) {
+        play('turn');
+      }
+      prevIsMyTurnRef.current = isMyTurn;
+    }, [isMyTurn, isBattlePhase, play]);
+
+    const handleAutoPlace = useCallback(() => {
+      play('click', 0.35);
+      onAutoPlace();
+    }, [onAutoPlace, play]);
+
+    const handleClearShips = useCallback(() => {
+      play('click', 0.3);
+      onClearShips();
+    }, [onClearShips, play]);
+
+    const handleReady = useCallback(() => {
+      play('deploy');
+      onReady();
+    }, [onReady, play]);
 
     const previewCells = useMemo(() => {
       if (!canPlace || !selectedShip) return new Set<number>();
@@ -280,10 +338,10 @@ export const BattleshipBoard = memo(
               >
                 Orientation: {orientation === 'horizontal' ? 'Horizontal' : 'Vertical'}
               </Button>
-              <Button type="button" size="sm" variant="secondary" onClick={onAutoPlace}>
+              <Button type="button" size="sm" variant="secondary" onClick={handleAutoPlace}>
                 Random Fleet
               </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={onClearShips}>
+              <Button type="button" size="sm" variant="ghost" onClick={handleClearShips}>
                 Clear
               </Button>
             </div>
@@ -292,7 +350,7 @@ export const BattleshipBoard = memo(
               type="button"
               className="w-full"
               disabled={ownShips.length !== 5}
-              onClick={onReady}
+              onClick={handleReady}
             >
               Ready for Battle
             </Button>

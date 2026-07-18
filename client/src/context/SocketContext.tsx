@@ -15,6 +15,7 @@ import { connectSocket, disconnectSocket, type AppSocket } from '../socket/socke
 import { useAuth } from './AuthContext';
 
 export type ConnectionState =
+  | 'idle'
   | 'connected'
   | 'disconnected_temporary'
   | 'disconnected_terminal'
@@ -45,7 +46,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const { token, logout } = useAuth();
   const navigate = useNavigate();
   const [socket, setSocket] = useState<AppSocket | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [lastDisconnectReason, setLastDisconnectReason] = useState<string | null>(null);
 
@@ -61,7 +62,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     if (!token) {
       disconnectSocket();
       setSocket(null);
-      setConnectionState('connecting');
+      setConnectionState('idle');
       setReconnectAttempts(0);
       setLastDisconnectReason(null);
       wasConnectedRef.current = false;
@@ -70,6 +71,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
     const s = connectSocket(token);
     setSocket(s);
+    setConnectionState('connecting');
 
     const onConnect = () => {
       if (wasConnectedRef.current) {
@@ -134,7 +136,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       s.io.off('reconnect_attempt', onReconnectAttempt);
       disconnectSocket();
       setSocket(null);
-      setConnectionState('connecting');
+      setConnectionState('idle');
       setReconnectAttempts(0);
       setLastDisconnectReason(null);
       wasConnectedRef.current = false;

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { GameType } from '@mpg/shared/types/games';
 import { useAuth } from '../context/AuthContext';
@@ -38,8 +38,24 @@ const GAME_OPTIONS: { type: GameType; label: string; players: string; icon: stri
 const HomePage = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
-  const { emit, isConnected } = useSocket();
+  const { emit, isConnected, connectionState } = useSocket();
   const { play } = useSounds();
+
+  const needsAuth = !user;
+  const isConnecting = !!user && connectionState === 'connecting';
+  const canPlay = !!user && isConnected;
+
+  const guardPlayAccess = (): boolean => {
+    if (needsAuth) {
+      toast.error('Sign in or play as guest to start a game.');
+      return false;
+    }
+    if (!isConnected) {
+      toast.error('Connecting to server. Please wait a moment…');
+      return false;
+    }
+    return true;
+  };
 
   /* ── Create Room state ── */
   const [createGameType, setCreateGameType] = useState<GameType>('tictactoe');
@@ -117,7 +133,7 @@ const HomePage = () => {
 
   /* ── Handlers ── */
   const handleCreateRoom = () => {
-    if (!isConnected) return toast.error('Not connected to server.');
+    if (!guardPlayAccess()) return;
     setIsCreating(true);
     emit('room:create', { gameType: createGameType, isPrivate }, (res) => {
       setIsCreating(false);
@@ -133,7 +149,7 @@ const HomePage = () => {
   const handleJoinRoom = () => {
     const code = joinRoomCode.trim().toLowerCase();
     if (!code) return toast.error('Please enter a room code.');
-    if (!isConnected) return toast.error('Not connected to server.');
+    if (!guardPlayAccess()) return;
     setIsJoining(true);
     emit('room:join', { roomCode: code }, (res) => {
       setIsJoining(false);
@@ -146,7 +162,7 @@ const HomePage = () => {
   };
 
   const handleMatchmakingJoin = () => {
-    if (!isConnected) return toast.error('Not connected to server.');
+    if (!guardPlayAccess()) return;
     emit('matchmaking:join', { gameType: matchGameType });
     setIsQueued(true);
   };
@@ -158,7 +174,7 @@ const HomePage = () => {
   };
 
   const handleSpectate = (roomCode: string) => {
-    if (!isConnected) return toast.error('Not connected to server.');
+    if (!guardPlayAccess()) return;
     emit('room:join', { roomCode, asSpectator: true }, (res) => {
       if (res.success) {
         navigate(`/room/${roomCode}`);
@@ -168,20 +184,61 @@ const HomePage = () => {
     });
   };
 
-  const displayName = user?.displayName || 'Player';
+  const displayName = user?.displayName ?? 'Player';
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* ── Hero ── */}
       <section className="text-center space-y-3">
         <h1 tabIndex={-1} className="text-4xl font-extrabold tracking-tight text-fg focus:outline-none">
-          Welcome back, <span className="text-primary">{displayName}</span>
+          {user ? (
+            <>
+              Welcome back, <span className="text-primary">{displayName}</span>
+            </>
+          ) : (
+            <>
+              Welcome to <span className="text-primary">MPG</span>
+            </>
+          )}
         </h1>
         <p className="text-fg-muted text-lg">
-          Create a room, join a friend, or find an opponent instantly.
+          {user
+            ? 'Create a room, join a friend, or find an opponent instantly.'
+            : 'Sign in or jump in as a guest to play real-time multiplayer games.'}
         </p>
 
-        {!isConnected && (
+        {needsAuth && (
+          <div
+            role="status"
+            className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 px-5 py-4 text-sm"
+          >
+            <p className="text-fg">
+              Multiplayer features require a session. Choose how you want to play:
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Link
+                to="/guest"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 font-medium text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              >
+                Play as Guest
+              </Link>
+              <Link
+                to="/login"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-surface px-4 font-medium text-fg transition-colors hover:bg-surface/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Create account
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {isConnecting && (
           <div className="inline-flex items-center gap-2 rounded-full bg-warning/15 px-4 py-1.5 text-sm text-warning">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning opacity-75" />
@@ -229,11 +286,14 @@ const HomePage = () => {
           <Button
             onClick={handleCreateRoom}
             isLoading={isCreating}
-            disabled={!isConnected}
+            disabled={!canPlay}
             className="w-full"
           >
             Create Room
           </Button>
+          {needsAuth && (
+            <p className="text-center text-xs text-fg-muted">Sign in or play as guest to create a room.</p>
+          )}
         </Card>
 
         {/* ── Join Room ── */}
@@ -256,11 +316,14 @@ const HomePage = () => {
           <Button
             onClick={handleJoinRoom}
             isLoading={isJoining}
-            disabled={!isConnected || !joinRoomCode.trim()}
+            disabled={!canPlay || !joinRoomCode.trim()}
             className="w-full mt-auto"
           >
             Join Room
           </Button>
+          {needsAuth && (
+            <p className="text-center text-xs text-fg-muted">Sign in or play as guest to join a room.</p>
+          )}
         </Card>
 
         {/* ── Matchmaking ── */}
@@ -291,11 +354,14 @@ const HomePage = () => {
 
               <Button
                 onClick={handleMatchmakingJoin}
-                disabled={!isConnected}
+                disabled={!canPlay}
                 className="w-full mt-auto"
               >
                 Find Match
               </Button>
+              {needsAuth && (
+                <p className="text-center text-xs text-fg-muted">Sign in or play as guest to use Quick Match.</p>
+              )}
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 py-4">
@@ -351,7 +417,7 @@ const HomePage = () => {
                     variant="secondary"
                     size="sm"
                     onClick={() => handleSpectate(room.roomCode)}
-                    disabled={!isConnected}
+                    disabled={!canPlay}
                     className="w-full"
                   >
                     Watch

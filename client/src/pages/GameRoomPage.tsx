@@ -38,7 +38,7 @@ const STATUS_CONFIG: Record<
 /* ── Game type labels ── */
 const GAME_LABELS: Record<string, string> = {
   tictactoe: 'Tic Tac Toe',
-  cardgame: 'Card Game',
+  battleship: 'Battleship',
 };
 
 /* ── Game end result state ── */

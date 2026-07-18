@@ -17,6 +17,6 @@ export const uuidParamValidator: ValidationChain[] = [
 export const gameTypeFilterValidator: ValidationChain[] = [
   query('gameType')
     .optional()
-    .isIn(['tictactoe', 'cardgame'])
-    .withMessage('gameType must be tictactoe or cardgame'),
+    .isIn(['tictactoe', 'battleship'])
+    .withMessage('gameType must be tictactoe or battleship'),
 ];

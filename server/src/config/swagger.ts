@@ -137,7 +137,7 @@ const MatchRecord: Record<string, unknown> = {
   properties: {
     id: { type: 'string', format: 'uuid' },
     roomCode: { type: 'string', example: 'ABC123' },
-    gameType: { type: 'string', enum: ['tictactoe', 'cardgame'], example: 'tictactoe' },
+    gameType: { type: 'string', enum: ['tictactoe', 'battleship'], example: 'tictactoe' },
     players: { type: 'array', items: MatchPlayerSnapshot },
     result: MatchResult,
     moves: {
@@ -252,7 +252,7 @@ export const swaggerSpec: Record<string, unknown> = {
     version,
     description:
       'Real-time multiplayer game platform API with room management, matchmaking, spectators, chat, and leaderboard. ' +
-      'Supports Tic-Tac-Toe and Card Game, extendable via GameFactory pattern.\n\n' +
+      'Supports Tic-Tac-Toe and Battleship, extendable via GameFactory pattern.\n\n' +
       '**Authentication:** Most endpoints require a JWT Bearer token obtained from `/api/auth/login` or `/api/auth/register`. ' +
       'Guest tokens are available via `/api/auth/guest` with limited functionality.\n\n' +
       '**Real-time:** WebSocket events are documented separately — this spec covers only the REST API.',
@@ -992,7 +992,7 @@ export const swaggerSpec: Record<string, unknown> = {
           {
             name: 'gameType',
             in: 'query',
-            schema: { type: 'string', enum: ['tictactoe', 'cardgame'] },
+            schema: { type: 'string', enum: ['tictactoe', 'battleship'] },
             description: 'Filter by game type',
           },
         ],
@@ -1086,7 +1086,7 @@ export const swaggerSpec: Record<string, unknown> = {
           {
             name: 'gameType',
             in: 'query',
-            schema: { type: 'string', enum: ['tictactoe', 'cardgame'] },
+            schema: { type: 'string', enum: ['tictactoe', 'battleship'] },
             description: 'Filter and rank by specific game type',
           },
         ],
@@ -1159,7 +1159,7 @@ export const swaggerSpec: Record<string, unknown> = {
                         matchesByGameType: {
                           type: 'object',
                           additionalProperties: { type: 'integer' },
-                          example: { tictactoe: 3200, cardgame: 1800 },
+                          example: { tictactoe: 3200, battleship: 1800 },
                         },
                         activeRoomsCount: { type: 'integer', example: 15 },
                         queueSize: { type: 'integer', example: 4 },
@@ -1387,7 +1387,7 @@ export const swaggerSpec: Record<string, unknown> = {
                             type: 'object',
                             properties: {
                               roomCode: { type: 'string', example: 'ABC123' },
-                              gameType: { type: 'string', enum: ['tictactoe', 'cardgame'], example: 'tictactoe' },
+                              gameType: { type: 'string', enum: ['tictactoe', 'battleship'], example: 'tictactoe' },
                               status: { type: 'string', example: 'waiting' },
                               playerCount: { type: 'integer', example: 2 },
                               createdAt: { type: 'string', format: 'date-time', nullable: true },
@@ -1457,7 +1457,7 @@ export const swaggerSpec: Record<string, unknown> = {
           {
             name: 'gameType',
             in: 'query',
-            schema: { type: 'string', enum: ['tictactoe', 'cardgame'] },
+            schema: { type: 'string', enum: ['tictactoe', 'battleship'] },
             description: 'Filter by game type',
           },
         ],

@@ -6,7 +6,7 @@ import { getDashboardStats, type DashboardStats } from '../../api/adminService';
 
 const GAME_TYPE_LABELS: Record<string, string> = {
   tictactoe: 'Tic Tac Toe',
-  cardgame: 'Card Game',
+  battleship: 'Battleship',
 };
 
 const AdminDashboard = () => {

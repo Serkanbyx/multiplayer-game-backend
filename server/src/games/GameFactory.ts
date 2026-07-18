@@ -1,11 +1,11 @@
 import { TicTacToe } from './TicTacToe.js';
-import { CardGame } from './CardGame.js';
+import { Battleship } from './Battleship.js';
 import type { GameType } from '../../../shared/types/games.js';
 import type { RoomPlayer } from '../../../shared/types/room.js';
 import type { GameConfig } from './BaseGame.js';
 
-type Registry = { tictactoe: typeof TicTacToe; cardgame: typeof CardGame };
-const REGISTRY: Registry = { tictactoe: TicTacToe, cardgame: CardGame };
+type Registry = { tictactoe: typeof TicTacToe; battleship: typeof Battleship };
+const REGISTRY: Registry = { tictactoe: TicTacToe, battleship: Battleship };
 
 export const GameFactory = {
   create<T extends GameType>(gameType: T, players: RoomPlayer[]): InstanceType<Registry[T]> {

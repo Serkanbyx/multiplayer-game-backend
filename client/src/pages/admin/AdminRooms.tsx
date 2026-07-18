@@ -13,7 +13,7 @@ const POLL_INTERVAL = 10_000;
 
 const GAME_TYPE_LABELS: Record<string, string> = {
   tictactoe: 'Tic Tac Toe',
-  cardgame: 'Card Game',
+  battleship: 'Battleship',
 };
 
 const statusVariant = (status: string): 'success' | 'warning' | 'default' => {

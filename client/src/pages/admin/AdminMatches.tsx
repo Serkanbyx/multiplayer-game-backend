@@ -16,7 +16,7 @@ const PAGE_SIZE = 20;
 
 const GAME_TYPE_LABELS: Record<string, string> = {
   tictactoe: 'Tic Tac Toe',
-  cardgame: 'Card Game',
+  battleship: 'Battleship',
 };
 
 const outcomeVariant = (outcome: string): 'success' | 'default' | 'danger' => {
@@ -79,7 +79,7 @@ const AdminMatches = () => {
           >
             <option value="">All Game Types</option>
             <option value="tictactoe">Tic Tac Toe</option>
-            <option value="cardgame">Card Game</option>
+            <option value="battleship">Battleship</option>
           </Select>
         </div>
       </div>

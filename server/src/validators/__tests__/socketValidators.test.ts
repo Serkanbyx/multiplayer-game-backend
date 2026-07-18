@@ -18,8 +18,8 @@ describe('validateRoomCreatePayload', () => {
     }
   });
 
-  it('should accept cardgame type', () => {
-    const result = validateRoomCreatePayload({ gameType: 'cardgame', isPrivate: true });
+  it('should accept battleship type', () => {
+    const result = validateRoomCreatePayload({ gameType: 'battleship', isPrivate: true });
     expect(result.ok).toBe(true);
   });
 
@@ -190,8 +190,8 @@ describe('validateMatchmakingJoin', () => {
     if (result.ok) expect(result.value).toEqual({ gameType: 'tictactoe' });
   });
 
-  it('should accept cardgame', () => {
-    const result = validateMatchmakingJoin({ gameType: 'cardgame' });
+  it('should accept battleship', () => {
+    const result = validateMatchmakingJoin({ gameType: 'battleship' });
     expect(result.ok).toBe(true);
   });
 

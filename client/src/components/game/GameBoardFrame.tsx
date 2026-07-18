@@ -1,7 +1,7 @@
 import { memo } from 'react';
-import type { GameType, GameState, GameAction, Card } from '@mpg/shared/types/games';
+import type { GameType, GameState, GameAction } from '@mpg/shared/types/games';
 import { TicTacToeBoard } from '../games/TicTacToeBoard';
-import { CardGameTable } from '../games/CardGameTable';
+import { BattleshipBoard } from '../games/BattleshipBoard';
 
 type GameBoardFrameProps = {
   gameType: GameType;
@@ -31,17 +31,24 @@ export const GameBoardFrame = memo(
           />
         );
       }
-      case 'cardgame': {
-        const handlePlayCard = (card: Card) => {
-          onAction({ type: 'cardgame:play_card', card });
-        };
+      case 'battleship': {
+        const canAct =
+          gameState.phase === 'placement'
+            ? !gameState.players.find((p) => p.userId === mySelfUserId)?.ready
+            : isMyTurn;
 
         return (
-          <CardGameTable
+          <BattleshipBoard
             {...gameState}
-            isMyTurn={isMyTurn}
+            isMyTurn={canAct}
             mySelfUserId={mySelfUserId}
-            onPlayCard={handlePlayCard}
+            onAutoPlace={() => onAction({ type: 'battleship:auto_place' })}
+            onClearShips={() => onAction({ type: 'battleship:clear_ships' })}
+            onReady={() => onAction({ type: 'battleship:ready' })}
+            onPlaceShip={(shipType, row, col, orientation) =>
+              onAction({ type: 'battleship:place_ship', shipType, row, col, orientation })
+            }
+            onFire={(row, col) => onAction({ type: 'battleship:fire', row, col })}
           />
         );
       }
@@ -52,4 +59,3 @@ export const GameBoardFrame = memo(
     }
   },
 );
-

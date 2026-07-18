@@ -32,7 +32,7 @@ const friendlyErrorMessage = (code?: string, fallback?: string): string =>
 /* ── Game type metadata ── */
 const GAME_OPTIONS: { type: GameType; label: string; players: string; icon: string }[] = [
   { type: 'tictactoe', label: 'Tic Tac Toe', players: '2 Players', icon: '⭕' },
-  { type: 'cardgame', label: 'Card Game', players: '4 Players', icon: '🃏' },
+  { type: 'battleship', label: 'Battleship', players: '2 Players', icon: '🚢' },
 ];
 
 const HomePage = () => {
@@ -405,7 +405,7 @@ const HomePage = () => {
                       {room.roomCode}
                     </span>
                     <Badge variant="info">
-                      {room.gameType === 'tictactoe' ? 'Tic Tac Toe' : 'Card Game'}
+                      {room.gameType === 'tictactoe' ? 'Tic Tac Toe' : 'Battleship'}
                     </Badge>
                   </div>
 

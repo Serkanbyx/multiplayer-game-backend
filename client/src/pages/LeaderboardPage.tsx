@@ -15,7 +15,7 @@ type GameFilter = 'all' | GameType;
 const GAME_FILTER_OPTIONS: { value: GameFilter; label: string }[] = [
   { value: 'all', label: 'All Games' },
   { value: 'tictactoe', label: 'Tic Tac Toe' },
-  { value: 'cardgame', label: 'Card Game' },
+  { value: 'battleship', label: 'Battleship' },
 ];
 
 const ITEMS_PER_PAGE = 25;

@@ -8,7 +8,7 @@ type GameStatsCardProps = {
 
 const GAME_TYPE_LABELS: Record<string, string> = {
   tictactoe: 'Tic Tac Toe',
-  cardgame: 'Card Game',
+  battleship: 'Battleship',
 };
 
 export const getGameLabel = (gameType: string): string =>

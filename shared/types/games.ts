@@ -1,11 +1,7 @@
-export type GameType = 'tictactoe' | 'cardgame';
+export type GameType = 'tictactoe' | 'battleship';
 
 export type Cell = null | 'X' | 'O';
 export type TicTacToeBoard = readonly [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell];
-
-export type Suit = '♠' | '♥' | '♦' | '♣';
-export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
-export type Card = { suit: Suit; rank: Rank };
 
 export type TicTacToeState = {
   gameType: 'tictactoe';
@@ -17,21 +13,47 @@ export type TicTacToeState = {
   winningLine: readonly [number, number, number] | null;
 };
 
-export type CardGameState = {
-  gameType: 'cardgame';
-  players: { userId: string; displayName: string; position: 0 | 1 | 2 | 3; handCount: number; tricksWon: number }[];
-  myHand?: Card[];
-  currentTrick: { userId: string; card: Card }[];
-  leadSuit: Suit | null;
-  currentTurnUserId: string;
-  trickNumber: number;
-  result: 'win' | 'draw' | null;
-  winner: string | null;
+export type BattleshipCell = 'empty' | 'ship' | 'hit' | 'miss';
+export type BattleshipShotCell = 'unknown' | 'hit' | 'miss' | 'sunk';
+export type BattleshipShipType = 'carrier' | 'battleship' | 'cruiser' | 'submarine' | 'destroyer';
+export type BattleshipOrientation = 'horizontal' | 'vertical';
+
+export type BattleshipShip = {
+  type: BattleshipShipType;
+  size: number;
+  cells: readonly { row: number; col: number }[];
+  sunk: boolean;
 };
 
-export type GameState = TicTacToeState | CardGameState;
+export type BattleshipLastShot = {
+  row: number;
+  col: number;
+  hit: boolean;
+  sunkShip: BattleshipShipType | null;
+  shooterId: string;
+};
+
+export type BattleshipState = {
+  gameType: 'battleship';
+  phase: 'placement' | 'battle' | 'finished';
+  boardSize: 10;
+  currentTurnUserId: string | null;
+  players: { userId: string; displayName: string; ready: boolean }[];
+  ownBoard: readonly BattleshipCell[];
+  ownShips: readonly BattleshipShip[];
+  opponentBoard: readonly BattleshipShotCell[];
+  shipsToPlace: readonly BattleshipShipType[];
+  lastShot: BattleshipLastShot | null;
+  winner: string | null;
+  result: 'win' | 'draw' | null;
+};
+
+export type GameState = TicTacToeState | BattleshipState;
 
 export type GameAction =
   | { type: 'tictactoe:play'; index: number }
-  | { type: 'cardgame:play_card'; card: Card }
-  | { type: 'cardgame:draw' };
+  | { type: 'battleship:auto_place' }
+  | { type: 'battleship:clear_ships' }
+  | { type: 'battleship:place_ship'; shipType: BattleshipShipType; row: number; col: number; orientation: BattleshipOrientation }
+  | { type: 'battleship:ready' }
+  | { type: 'battleship:fire'; row: number; col: number };

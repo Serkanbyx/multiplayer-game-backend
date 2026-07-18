@@ -2,7 +2,7 @@ import type { TypedServer, TypedSocket } from './index.js';
 import { GameFactory } from '../games/GameFactory.js';
 import { BaseGame } from '../games/BaseGame.js';
 import { TicTacToe } from '../games/TicTacToe.js';
-import { CardGame } from '../games/CardGame.js';
+import { Battleship } from '../games/Battleship.js';
 import { redis } from '../config/redis.js';
 import * as roomService from '../services/roomService.js';
 import * as matchService from '../services/matchService.js';
@@ -41,7 +41,7 @@ export const loadGame = async (roomCode: string): Promise<{ game: BaseGame<GameS
   const { gameType, data } = JSON.parse(raw) as { gameType: GameType; data: unknown };
 
   if (gameType === 'tictactoe') return { game: TicTacToe.deserialize(data), gameType };
-  if (gameType === 'cardgame') return { game: CardGame.deserialize(data), gameType };
+  if (gameType === 'battleship') return { game: Battleship.deserialize(data), gameType };
 
   return null;
 };
@@ -223,7 +223,7 @@ export const handleAbortOnLeave = async (
     position: p.position,
   }));
 
-  if (gameType === 'tictactoe') {
+  if (gameType === 'tictactoe' || gameType === 'battleship') {
     const remainingPlayer = room.players.find((p) => p.userId !== leavingUserId);
     const winnerId = remainingPlayer?.userId ?? null;
 
@@ -373,10 +373,13 @@ export const registerGameHandlers = (io: TypedServer, socket: TypedSocket): void
       if (game.isGameOver()) {
         await endGame(io, roomCode, game, gameType);
       } else {
-        io.in(`room:${roomCode}`).emit('game:turn', {
-          roomCode,
-          currentPlayerId: game.getCurrentPlayerId(),
-        });
+        const currentPlayerId = game.getCurrentPlayerId();
+        if (currentPlayerId) {
+          io.in(`room:${roomCode}`).emit('game:turn', {
+            roomCode,
+            currentPlayerId,
+          });
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to process game action';

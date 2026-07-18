@@ -9,7 +9,7 @@ type ValidatorResult<T> =
 
 /* ─── Allowed Game Types (closed-world whitelist) ─────────────── */
 
-const ALLOWED_GAME_TYPES: readonly GameType[] = ['tictactoe', 'cardgame'];
+const ALLOWED_GAME_TYPES: readonly GameType[] = ['tictactoe', 'battleship'];
 
 const isValidGameType = (v: unknown): v is GameType =>
   typeof v === 'string' && ALLOWED_GAME_TYPES.includes(v as GameType);

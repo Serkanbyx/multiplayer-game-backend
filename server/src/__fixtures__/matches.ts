@@ -21,21 +21,19 @@ export const sampleTicTacToeMatch: MatchRecord = {
   createdAt: '2025-11-14T00:00:00.000Z',
 };
 
-export const sampleCardGameMatch: MatchRecord = {
-  id: 'match-cg-001',
+export const sampleBattleshipMatch: MatchRecord = {
+  id: 'match-bs-001',
   roomCode: 'ef56gh78',
-  gameType: 'cardgame',
+  gameType: 'battleship',
   players: [
-    { userId: 'user-1', displayName: 'Alice', isGuest: false, score: 5, position: 0 },
-    { userId: 'user-2', displayName: 'Bob', isGuest: false, score: 3, position: 1 },
-    { userId: 'user-3', displayName: 'Charlie', isGuest: false, score: 3, position: 2 },
-    { userId: 'user-4', displayName: 'Diana', isGuest: true, score: 2, position: 3 },
+    { userId: 'user-1', displayName: 'Alice', isGuest: false, score: 1, position: 0 },
+    { userId: 'user-2', displayName: 'Bob', isGuest: false, score: 0, position: 1 },
   ],
   result: { outcome: 'win', winnerId: 'user-1' },
   moves: [],
   winnerUserId: 'user-1',
   duration: 180000,
-  totalRounds: 13,
+  totalRounds: 1,
   startedAt: '2025-11-14T00:00:00.000Z',
   endedAt: '2025-11-14T00:03:00.000Z',
   createdAt: '2025-11-14T00:00:00.000Z',

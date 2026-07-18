@@ -108,6 +108,6 @@ export const adminMatchesQueryValidator: ValidationChain[] = [
     .toInt(),
   query('gameType')
     .optional()
-    .isIn(['tictactoe', 'cardgame'])
-    .withMessage('gameType must be tictactoe or cardgame'),
+    .isIn(['tictactoe', 'battleship'])
+    .withMessage('gameType must be tictactoe or battleship'),
 ];

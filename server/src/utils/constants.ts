@@ -4,6 +4,6 @@ export const MAX_CHAT_MESSAGES = 50;
 export const MAX_SPECTATORS = 10;
 export const MAX_PLAYERS: Record<string, number> = {
   tictactoe: 2,
-  cardgame: 4,
+  battleship: 2,
 };
 export const DISCONNECT_GRACE_MS = 30_000;

@@ -6,9 +6,21 @@ import { CardGame } from '../games/CardGame.js';
 import { redis } from '../config/redis.js';
 import * as roomService from '../services/roomService.js';
 import * as matchService from '../services/matchService.js';
+import { childLogger } from '../utils/logger.js';
 import type { GameType, GameState } from '../../../shared/types/games.js';
 import type { Room } from '../../../shared/types/room.js';
 import type { MatchPlayerSnapshot, MatchResult } from '../../../shared/types/match.js';
+
+const log = childLogger({ module: 'gameHandlers' });
+
+type GameEndedPayload = {
+  roomCode: string;
+  result: 'win' | 'draw' | 'aborted';
+  winnerId: string | null;
+  winnerDisplayName: string | null;
+  matchId: string | null;
+  reason: string;
+};
 
 /* ─── Redis Key Helpers ──────────────────────────────────────── */
 
@@ -59,6 +71,24 @@ const emitStateToRoom = async (
       gameState: game.getStateFor(null),
     });
   }
+};
+
+const emitGameEnded = (io: TypedServer, room: Room, payload: GameEndedPayload): void => {
+  io.in(`room:${room.roomCode}`).emit('game:ended', payload);
+
+  const participantIds = [
+    ...room.players.map((p) => p.userId),
+    ...room.spectators.map((s) => s.userId),
+  ];
+  for (const uid of participantIds) {
+    io.to(`user:${uid}`).emit('game:ended', payload);
+  }
+
+  io.in(`room:${room.roomCode}`).emit('room:updated', {
+    ...room,
+    status: 'finished',
+    rematchVotes: [],
+  });
 };
 
 /* ─── Start Game ──────────────────────────────────────────────── */
@@ -128,25 +158,31 @@ const endGame = async (
 
   const duration = room.startedAt ? Date.now() - room.startedAt : 0;
 
-  const matchRow = await matchService.recordMatch({
-    gameType,
-    roomCode,
-    players: playerSnapshots,
-    result,
-    moves: game.getMoveLog().map((m) => {
-      const move = m as Record<string, unknown>;
-      return {
-        by: (move.userId as string) ?? '',
-        type: gameType,
-        payload: move,
-        at: (move.t as number) ?? Date.now(),
-      };
-    }),
-    duration,
-    totalRounds: 1,
-    startedAt: new Date(room.startedAt ?? Date.now()),
-    endedAt: new Date(),
-  });
+  let matchId: string | null = null;
+  try {
+    const matchRow = await matchService.recordMatch({
+      gameType,
+      roomCode,
+      players: playerSnapshots,
+      result,
+      moves: game.getMoveLog().map((m) => {
+        const move = m as Record<string, unknown>;
+        return {
+          by: (move.userId as string) ?? '',
+          type: gameType,
+          payload: move,
+          at: (move.t as number) ?? Date.now(),
+        };
+      }),
+      duration,
+      totalRounds: 1,
+      startedAt: new Date(room.startedAt ?? Date.now()),
+      endedAt: new Date(),
+    });
+    matchId = matchRow.id;
+  } catch (err) {
+    log.error({ err, roomCode }, 'Failed to record match — continuing with game end');
+  }
 
   await removeGame(roomCode);
 
@@ -155,19 +191,13 @@ const endGame = async (
     ? room.players.find((p) => p.userId === winnerId)
     : null;
 
-  io.in(`room:${roomCode}`).emit('game:ended', {
+  emitGameEnded(io, room, {
     roomCode,
     result: gameResult?.result ?? 'draw',
     winnerId,
     winnerDisplayName: winnerPlayer?.displayName ?? null,
-    matchId: matchRow.id,
+    matchId,
     reason: 'completed',
-  });
-
-  io.in(`room:${roomCode}`).emit('room:updated', {
-    ...room,
-    status: 'finished',
-    rematchVotes: [],
   });
 };
 
@@ -204,29 +234,38 @@ export const handleAbortOnLeave = async (
       rematchVotes: [],
     }));
 
+    let matchId: string | null = null;
     if (winnerId) {
-      await matchService.recordMatch({
-        gameType,
-        roomCode,
-        players: playerSnapshots,
-        result: { outcome: 'win', winnerId },
-        duration,
-        totalRounds: 1,
-        startedAt: new Date(room.startedAt ?? Date.now()),
-        endedAt: new Date(),
-      });
+      try {
+        const matchRow = await matchService.recordMatch({
+          gameType,
+          roomCode,
+          players: playerSnapshots,
+          result: { outcome: 'win', winnerId },
+          duration,
+          totalRounds: 1,
+          startedAt: new Date(room.startedAt ?? Date.now()),
+          endedAt: new Date(),
+        });
+        matchId = matchRow.id;
+      } catch (err) {
+        log.error({ err, roomCode }, 'Failed to record forfeit match');
+      }
     }
 
     await removeGame(roomCode);
 
-    io.in(`room:${roomCode}`).emit('game:ended', {
-      roomCode,
-      result: 'win',
-      winnerId,
-      winnerDisplayName: remainingPlayer?.displayName ?? null,
-      matchId: null,
-      reason: 'forfeit',
-    });
+    const finishedRoom = await roomService.getRoom(roomCode);
+    if (finishedRoom) {
+      emitGameEnded(io, finishedRoom, {
+        roomCode,
+        result: 'win',
+        winnerId,
+        winnerDisplayName: remainingPlayer?.displayName ?? null,
+        matchId,
+        reason: 'forfeit',
+      });
+    }
   } else {
     await roomService.updateRoom(roomCode, (current) => ({
       ...current,
@@ -235,27 +274,34 @@ export const handleAbortOnLeave = async (
       rematchVotes: [],
     }));
 
-    await matchService.abortMatch({
-      gameType,
-      roomCode,
-      players: playerSnapshots,
-      forfeitedBy: leavingUserId,
-      duration,
-      totalRounds: 1,
-      startedAt: new Date(room.startedAt ?? Date.now()),
-      endedAt: new Date(),
-    });
+    try {
+      await matchService.abortMatch({
+        gameType,
+        roomCode,
+        players: playerSnapshots,
+        forfeitedBy: leavingUserId,
+        duration,
+        totalRounds: 1,
+        startedAt: new Date(room.startedAt ?? Date.now()),
+        endedAt: new Date(),
+      });
+    } catch (err) {
+      log.error({ err, roomCode }, 'Failed to record aborted match');
+    }
 
     await removeGame(roomCode);
 
-    io.in(`room:${roomCode}`).emit('game:ended', {
-      roomCode,
-      result: 'aborted',
-      winnerId: null,
-      winnerDisplayName: null,
-      matchId: null,
-      reason: 'player_left',
-    });
+    const finishedRoom = await roomService.getRoom(roomCode);
+    if (finishedRoom) {
+      emitGameEnded(io, finishedRoom, {
+        roomCode,
+        result: 'aborted',
+        winnerId: null,
+        winnerDisplayName: null,
+        matchId: null,
+        reason: 'player_left',
+      });
+    }
   }
 };
 

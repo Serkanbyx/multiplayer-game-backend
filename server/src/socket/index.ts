@@ -79,6 +79,19 @@ const handleReconnection = async (io: TypedServer, socket: TypedSocket): Promise
           currentPlayerId: loaded.game.getCurrentPlayerId(),
         });
       }
+    } else if (updatedRoom.status === 'finished' && updatedRoom.gameState?.result) {
+      const gs = updatedRoom.gameState;
+      const winnerPlayer = gs.winner
+        ? updatedRoom.players.find((p) => p.userId === gs.winner)
+        : null;
+      socket.emit('game:ended', {
+        roomCode,
+        result: gs.result === 'draw' ? 'draw' : 'win',
+        winnerId: gs.winner,
+        winnerDisplayName: winnerPlayer?.displayName ?? null,
+        matchId: null,
+        reason: 'completed',
+      });
     }
 
     log.info({ roomCode, role: 'player' }, 'Reconnected to room');

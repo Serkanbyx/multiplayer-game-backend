@@ -18,6 +18,12 @@ import {
   MobileTabBar,
 } from '../components/game';
 import type { MobileTab } from '../components/game';
+import { buildGameEndFromState, type GameEndResult } from '../utils/gameEndUtils';
+import {
+  getGuestSessionStats,
+  recordGuestSessionOutcome,
+  type GuestSessionStats,
+} from '../utils/guestSessionStats';
 
 /* ── Status pill variant map ── */
 const STATUS_CONFIG: Record<
@@ -36,11 +42,6 @@ const GAME_LABELS: Record<string, string> = {
 };
 
 /* ── Game end result state ── */
-type GameEndResult = {
-  result: 'win' | 'draw' | 'aborted';
-  winnerId: string | null;
-  winnerDisplayName: string | null;
-};
 
 /* ── Grace period for forfeit countdown (matches server Step 24) ── */
 const DISCONNECT_GRACE_SECONDS = 30;
@@ -48,7 +49,7 @@ const DISCONNECT_GRACE_SECONDS = 30;
 const GameRoomPage = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { emit, isConnected, connectionState } = useSocket();
   const { play } = useSounds();
 
@@ -58,6 +59,8 @@ const GameRoomPage = () => {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [currentTurnUserId, setCurrentTurnUserId] = useState<string | null>(null);
   const [gameEndResult, setGameEndResult] = useState<GameEndResult | null>(null);
+  const [matchRecorded, setMatchRecorded] = useState(false);
+  const [guestSessionStats, setGuestSessionStats] = useState<GuestSessionStats | null>(null);
   const [rematchVotes, setRematchVotes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -68,19 +71,75 @@ const GameRoomPage = () => {
     Map<string, { displayName: string; secondsLeft: number }>
   >(new Map());
   const countdownIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
-
   const hasJoinedRef = useRef(false);
+
   const mySelfUserId = user?._id ?? '';
+
+  const applyGameEnd = useCallback(
+    (
+      end: GameEndResult,
+      options?: { matchId?: string | null; reason?: string; playSound?: boolean },
+    ) => {
+      setGameEndResult(end);
+      setMatchRecorded(Boolean(options?.matchId));
+      setCurrentTurnUserId(null);
+      setRoom((prev) => (prev ? { ...prev, status: 'finished' } : prev));
+
+      if (options?.playSound !== false) {
+        if (end.result === 'draw') {
+          play('draw');
+        } else if (end.result === 'win') {
+          play(end.winnerId === mySelfUserId ? 'win' : 'lose');
+        }
+      }
+
+      if (isGuest()) {
+        if (end.result === 'draw') {
+          setGuestSessionStats(recordGuestSessionOutcome('draw'));
+        } else if (end.result === 'win') {
+          setGuestSessionStats(
+            recordGuestSessionOutcome(end.winnerId === mySelfUserId ? 'win' : 'loss'),
+          );
+        }
+      }
+
+      if (end.result === 'win' && end.winnerId === mySelfUserId) {
+        toast.success('Victory! Great game.', { icon: '🏆', duration: 4000 });
+      } else if (end.result === 'draw') {
+        toast('Draw game — well played!', { icon: '🤝' });
+      }
+
+      countdownIntervalsRef.current.forEach((interval) => clearInterval(interval));
+      countdownIntervalsRef.current.clear();
+      setDisconnectedOpponents(new Map());
+    },
+    [mySelfUserId, play, isGuest],
+  );
+
+  /* ── Fallback: show end screen if room finished but game:ended was missed ── */
+  useEffect(() => {
+    if (gameEndResult || room?.status !== 'finished' || !gameState) return;
+    const derived = buildGameEndFromState(gameState, room.players);
+    if (derived) {
+      applyGameEnd(derived, { playSound: false });
+    }
+  }, [gameEndResult, room, gameState, applyGameEnd]);
+
+  useEffect(() => {
+    if (isGuest()) {
+      setGuestSessionStats(getGuestSessionStats());
+    }
+  }, [isGuest]);
 
   /* ── Mobile tab navigation ── */
   const [mobileTab, setMobileTab] = useState<MobileTab>('game');
   const [unreadChat, setUnreadChat] = useState(false);
 
-  /* ── Derived values ── */
   const iAmPlayer = room?.players.some((p) => p.userId === mySelfUserId) ?? false;
   const isMyTurn = currentTurnUserId === mySelfUserId;
   const statusConfig = STATUS_CONFIG[room?.status ?? ''] ?? { label: 'Waiting', variant: 'warning' as const };
   const isPlaying = room?.status === 'playing';
+  const isGameOver = gameEndResult !== null || room?.status === 'finished';
 
   /* ── Start/stop opponent disconnect countdown ── */
   const startOpponentCountdown = useCallback((userId: string, displayName: string) => {
@@ -148,6 +207,10 @@ const GameRoomPage = () => {
           setGameState(res.room.gameState);
           setCurrentTurnUserId(res.room.gameState.currentTurnUserId);
         }
+        if (res.room.status === 'finished' && res.room.gameState) {
+          const derived = buildGameEndFromState(res.room.gameState, res.room.players);
+          if (derived) setGameEndResult(derived);
+        }
       } else {
         toast.error(res.error ?? 'Failed to join room.');
         navigate('/', { replace: true });
@@ -193,6 +256,15 @@ const GameRoomPage = () => {
       setGameState(updatedRoom.gameState);
       setCurrentTurnUserId(updatedRoom.gameState.currentTurnUserId);
     }
+
+    if (updatedRoom.status === 'finished') {
+      setGameEndResult((prev) => {
+        if (prev) return prev;
+        const gs = updatedRoom.gameState;
+        if (!gs) return prev;
+        return buildGameEndFromState(gs, updatedRoom.players);
+      });
+    }
   }, [isPlaying, mySelfUserId, stopOpponentCountdown, startOpponentCountdown]);
 
   const handlePlayerJoined = useCallback(
@@ -233,6 +305,7 @@ const GameRoomPage = () => {
       setGameState(data.gameState);
       setCurrentTurnUserId(data.gameState.currentTurnUserId);
       setGameEndResult(null);
+      setMatchRecorded(false);
       setRematchVotes([]);
       setRoom((prev) => (prev ? { ...prev, status: 'playing' } : prev));
     },
@@ -271,29 +344,16 @@ const GameRoomPage = () => {
       matchId: string | null;
       reason: string;
     }) => {
-      setGameEndResult({
-        result: data.result,
-        winnerId: data.winnerId,
-        winnerDisplayName: data.winnerDisplayName,
-      });
-      setCurrentTurnUserId(null);
-      setRoom((prev) => (prev ? { ...prev, status: 'finished' } : prev));
-
-      if (data.result === 'draw') {
-        play('draw');
-      } else if (data.result === 'win') {
-        if (data.winnerId === mySelfUserId) {
-          play('win');
-        } else {
-          play('lose');
-        }
-      }
-
-      countdownIntervalsRef.current.forEach((interval) => clearInterval(interval));
-      countdownIntervalsRef.current.clear();
-      setDisconnectedOpponents(new Map());
+      applyGameEnd(
+        {
+          result: data.result,
+          winnerId: data.winnerId,
+          winnerDisplayName: data.winnerDisplayName,
+        },
+        { matchId: data.matchId, reason: data.reason },
+      );
     },
-    [mySelfUserId, play],
+    [applyGameEnd],
   );
 
   const handleChatMessage = useCallback(
@@ -411,9 +471,10 @@ const GameRoomPage = () => {
     emit('game:rematch-request');
   }, [emit]);
 
-  const handleRematchDecline = useCallback(() => {
+  const handleRematchDeclineLocal = useCallback(() => {
+    emit('room:leave');
     navigate('/');
-  }, [navigate]);
+  }, [emit, navigate]);
 
   const handleMobileTabChange = useCallback((tab: MobileTab) => {
     setMobileTab(tab);
@@ -532,7 +593,7 @@ const GameRoomPage = () => {
             currentPlayerId={currentTurnUserId}
             mySelfUserId={mySelfUserId}
             players={room.players}
-            gameOver={gameEndResult !== null}
+            gameOver={isGameOver}
           />
 
           {gameState ? (
@@ -598,8 +659,11 @@ const GameRoomPage = () => {
         winnerId={gameEndResult?.winnerId ?? null}
         winnerDisplayName={gameEndResult?.winnerDisplayName ?? null}
         mySelfUserId={mySelfUserId}
+        isGuest={isGuest()}
+        matchRecorded={matchRecorded}
+        guestSessionStats={guestSessionStats}
         onRequest={handleRematchRequest}
-        onDecline={handleRematchDecline}
+        onDecline={handleRematchDeclineLocal}
       />
     </div>
   );

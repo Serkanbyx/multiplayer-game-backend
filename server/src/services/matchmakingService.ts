@@ -3,6 +3,7 @@ import { GameFactory } from "../games/GameFactory.js";
 import { MATCHMAKING_TTL_SECONDS } from "../utils/constants.js";
 import * as roomService from "./roomService.js";
 import { getIo } from "../socket/io.js";
+import { startGame } from "../socket/gameHandlers.js";
 import type { GameType } from "../../../shared/types/games.js";
 import type { AuthUser } from "../../../shared/types/auth.js";
 import type { RoomPlayer } from "../../../shared/types/room.js";
@@ -159,6 +160,9 @@ const tryMatch = async (gameType: GameType): Promise<void> => {
       };
       await roomService.addPlayer(room.roomCode, player);
     }
+
+    // Room is full — start the game (same as room:join auto-start path)
+    await startGame(io, room.roomCode);
 
     // Notify all matched players and join them to room channel
     for (const entry of validEntries) {

@@ -2,7 +2,7 @@ import type { TypedServer, TypedSocket } from './index.js';
 import type { RoomPlayer, RoomSpectator } from '../../../shared/types/room.js';
 import { GameFactory } from '../games/GameFactory.js';
 import * as roomService from '../services/roomService.js';
-import { startGame, handleAbortOnLeave } from './gameHandlers.js';
+import { startGame, handleAbortOnLeave, loadGame } from './gameHandlers.js';
 import { cancelGraceTimer } from './disconnectHandlers.js';
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
@@ -87,6 +87,26 @@ export const registerRoomHandlers = (io: TypedServer, socket: TypedSocket): void
                 ),
               }));
               io.in(socketRoomChannel(normalizedCode)).emit('room:updated', updatedRoom);
+
+              if (updatedRoom.status === 'playing') {
+                const loaded = await loadGame(normalizedCode);
+                if (loaded) {
+                  const gameState = loaded.game.getStateFor(userId);
+                  socket.emit('game:state-updated', {
+                    roomCode: normalizedCode,
+                    gameState,
+                  });
+                  socket.emit('game:turn', {
+                    roomCode: normalizedCode,
+                    currentPlayerId: loaded.game.getCurrentPlayerId(),
+                  });
+                  return callback({
+                    success: true,
+                    room: { ...updatedRoom, gameState },
+                  });
+                }
+              }
+
               return callback({ success: true, room: updatedRoom });
             }
 

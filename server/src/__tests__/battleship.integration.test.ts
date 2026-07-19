@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
+import type { Socket as ClientSocket } from 'socket.io-client';
 import { emitWithCb, waitForEvent, createTestClient } from './helpers/createTestClient.js';
+
+type StateUpdatedPayload = { gameState: { phase: string; gameType: string } };
+
+const actionAndWaitBoth = async (
+  actingSocket: ClientSocket,
+  otherSocket: ClientSocket,
+  action: { type: string },
+): Promise<[StateUpdatedPayload, StateUpdatedPayload]> => {
+  const actingUpdate = waitForEvent<StateUpdatedPayload>(actingSocket, 'game:state-updated');
+  const otherUpdate = waitForEvent<StateUpdatedPayload>(otherSocket, 'game:state-updated');
+  actingSocket.emit('game:action', action);
+  return Promise.all([actingUpdate, otherUpdate]);
+};
 
 describe('Battleship Integration', () => {
   it('2 players deploy fleets and enter battle phase', async () => {
@@ -26,22 +40,16 @@ describe('Battleship Integration', () => {
       expect(p1Started.gameState.phase).toBe('placement');
       expect(p2Started.gameState.phase).toBe('placement');
 
-      p1.socket.emit('game:action', { type: 'battleship:auto_place' });
-      await waitForEvent(p1.socket, 'game:state-updated');
+      await actionAndWaitBoth(p1.socket, p2.socket, { type: 'battleship:auto_place' });
+      await actionAndWaitBoth(p1.socket, p2.socket, { type: 'battleship:ready' });
+      await actionAndWaitBoth(p2.socket, p1.socket, { type: 'battleship:auto_place' });
 
-      p1.socket.emit('game:action', { type: 'battleship:ready' });
-      await waitForEvent(p1.socket, 'game:state-updated');
+      const [p1Battle, p2Battle] = await actionAndWaitBoth(p2.socket, p1.socket, {
+        type: 'battleship:ready',
+      });
 
-      p2.socket.emit('game:action', { type: 'battleship:auto_place' });
-      await waitForEvent(p2.socket, 'game:state-updated');
-
-      const battlePromises = [p1, p2].map((p) => waitForEvent(p.socket, 'game:state-updated'));
-      p2.socket.emit('game:action', { type: 'battleship:ready' });
-
-      const battleStates = await Promise.all(battlePromises);
-      for (const s of battleStates) {
-        expect(s.gameState.phase).toBe('battle');
-      }
+      expect(p1Battle.gameState.phase).toBe('battle');
+      expect(p2Battle.gameState.phase).toBe('battle');
     } finally {
       p1.cleanup();
       p2.cleanup();

@@ -14,14 +14,12 @@ describe('Battleship Integration', () => {
       expect(createRes.success).toBe(true);
       const roomCode = createRes.room!.roomCode;
 
-      const p2JoinPromise = waitForEvent(p2.socket, 'game:started');
+      const p1StartedPromise = waitForEvent(p1.socket, 'game:started');
+      const p2StartedPromise = waitForEvent(p2.socket, 'game:started');
 
       await emitWithCb(p2.socket, 'room:join', { roomCode });
 
-      const [p1Started, p2Started] = await Promise.all([
-        waitForEvent(p1.socket, 'game:started'),
-        p2JoinPromise,
-      ]);
+      const [p1Started, p2Started] = await Promise.all([p1StartedPromise, p2StartedPromise]);
 
       expect(p1Started.gameState.gameType).toBe('battleship');
       expect(p2Started.gameState.gameType).toBe('battleship');
